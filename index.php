@@ -1,12 +1,6 @@
-<?php 
-// 1. Setup the page title dynamically
-$pageTitle = "PawnPro | Unit-01 Tactical SaaS"; 
+<?php
+// /index.php - The Entry Point
+// This file simply loads the landing page view.
 
-// 2. Load the reusable header
-require_once 'includes/header.php'; 
-?>
-
-<?php 
-// 3. Load the reusable footer
-require_once 'includes/footer.php'; 
-?>
+// We use __DIR__ to make sure PHP knows exactly where to look relative to this file
+require_once __DIR__ . '/views/landing.php';
