@@ -4,7 +4,7 @@ require_once '../../config/db_connect.php';
 
 // 1. Security & Tenant Routing
 if (!isset($_SESSION['schema_name'])) {
-    header("Location: ../../Auth/login.php");
+    header("Location: /views/auth/login.php");
     exit;
 }
 $schemaName = $_SESSION['schema_name'];
