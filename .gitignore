@@ -1,0 +1,5 @@
+# Ignore Environment Variables (Security!)
+.env
+
+# Ignore Mac system files (if you are on Mac)
+.DS_Store
