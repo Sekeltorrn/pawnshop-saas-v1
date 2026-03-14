@@ -86,25 +86,35 @@
     <div class="fixed inset-0 scanline-overlay z-50 opacity-20 pointer-events-none"></div>
 
     <nav class="sticky top-0 z-40 w-full border-b border-eva-purple/50 bg-background-dark/80 backdrop-blur-md px-6 py-4">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="text-primary material-symbols-outlined text-3xl">terminal</div>
-                <span class="text-2xl font-bold tracking-tighter text-white">PAWN<span class="text-neon-green">PRO</span></span>
-            </div>
-            
-            <div class="hidden md:flex items-center gap-8 text-xs font-bold tracking-[0.2em] uppercase text-gray-400">
-                <a class="hover:text-neon-green transition-colors" href="signup.php">Signup/Login</a>
-                <a class="hover:text-neon-green transition-colors" href="contact.php">Contact Us</a>
-                <a class="hover:text-neon-green transition-colors" href="discover.php">Discover</a>
-            </div>
+        <div class="max-w-7xl mx-auto flex items-center justify-between relative">
+    
+    <div class="flex items-center gap-3">
+        
+        <a href="landing.php" class="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+    
+    <div class="text-primary material-symbols-outlined text-3xl group-hover:animate-pulse">terminal</div>
+    
+    <span class="text-2xl font-bold tracking-tighter text-white">
+        PAWN<span class="text-neon-green">PRO</span>
+    </span>
 
-            <div class="flex items-center gap-4">
-                <span class="text-[10px] font-mono text-neon-green hidden sm:inline-block">STATUS: ONLINE // UNIT-01</span>
-                <a href="#deploy-section" class="bg-primary text-white px-6 py-2 rounded-sm font-bold text-xs tracking-widest uppercase glow-primary hover:scale-105 transition-transform">
-                    DEPLOY
-                </a>
-            </div>
-        </div>
+</a>
+    </div>
+
+    <div class="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8 text-xs font-bold tracking-[0.2em] uppercase text-gray-400">
+        <a class="hover:text-neon-green transition-colors" href="/views/auth/signup.php">Signup/Login</a>
+        <a class="hover:text-neon-green transition-colors" href="contact.php">Contact Us</a>
+        <a class="hover:text-neon-green transition-colors" href="discover.php">Discover</a>
+    </div>
+
+    <div class="flex items-center gap-4">
+        <span class="text-[10px] font-mono text-neon-green hidden sm:inline-block">STATUS: ONLINE // UNIT-01</span>
+        <a href="#deploy-section" class="bg-primary text-white px-6 py-2 rounded-sm font-bold text-xs tracking-widest uppercase glow-primary hover:scale-105 transition-transform">
+            DEPLOY
+        </a>
+    </div>
+
+</div>
     </nav>
 
     <section class="relative min-h-[90vh] flex flex-col items-center justify-center px-4 pt-20 pb-32 overflow-hidden hex-grid">
@@ -133,14 +143,14 @@
             </p>
 
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="signup.php" class="group relative px-10 py-5 bg-primary overflow-hidden rounded-sm transition-all hover:pr-12 glow-primary flex items-center justify-center">
+                <a href="/views/auth/signup.php" class="group relative px-10 py-5 bg-primary overflow-hidden rounded-sm transition-all hover:pr-12 glow-primary flex items-center justify-center">
                     <span class="relative z-10 text-white font-bold text-sm tracking-[0.2em] uppercase">Initialize System</span>
                     <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-300">
                         <span class="material-symbols-outlined">arrow_forward</span>
                     </div>
                 </a>
 
-                <a href="demo.php" class="px-10 py-5 border border-white/20 hover:border-neon-green transition-colors text-white font-bold text-sm tracking-[0.2em] uppercase rounded-sm bg-white/5 flex items-center justify-center">
+                <a href="views/landing/demo.php" class="px-10 py-5 border border-white/20 hover:border-neon-green transition-colors text-white font-bold text-sm tracking-[0.2em] uppercase rounded-sm bg-white/5 flex items-center justify-center">
                     Interface Demo
                 </a>
             </div>
@@ -284,11 +294,11 @@
                 <p class="text-gray-400 max-w-xl mb-12 text-lg">Secure your sector. Optimize your assets. Join the next generation of tactical pawnbroking today.</p>
                 
                 <div class="flex flex-col sm:flex-row gap-6">
-                    <a href="signup.php" class="bg-primary text-white px-12 py-5 rounded-sm font-bold text-sm tracking-[0.3em] uppercase glow-primary hover:scale-105 transition-all flex items-center justify-center">
+                    <a href="/views/auth/signup.php" class="bg-primary text-white px-12 py-5 rounded-sm font-bold text-sm tracking-[0.3em] uppercase glow-primary hover:scale-105 transition-all flex items-center justify-center">
                         SYSTEM START
                     </a>
                     
-                    <a href="contact.php" class="bg-neon-green/10 text-neon-green border border-neon-green/30 px-12 py-5 rounded-sm font-bold text-sm tracking-[0.3em] uppercase hover:bg-neon-green/20 transition-all flex items-center justify-center">
+                    <a href="views/landing/contact.php" class="bg-neon-green/10 text-neon-green border border-neon-green/30 px-12 py-5 rounded-sm font-bold text-sm tracking-[0.3em] uppercase hover:bg-neon-green/20 transition-all flex items-center justify-center">
                         Request Intel
                     </a>
                 </div>
