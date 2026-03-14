@@ -5,30 +5,36 @@ class Supabase {
     private $key;
 
     public function __construct() {
-        // 1. Load Environment Variables
-        $envPath = __DIR__ . '/../.env';
-        
-        if (!file_exists($envPath)) {
-            die("Configuration Error: .env file not found at $envPath");
-        }
+        // 1. CLOUD SMART CHECK: Try pulling from Render's Secure Vault first
+        $this->url = getenv('SUPABASE_URL');
+        $this->key = getenv('SUPABASE_KEY');
 
-        // --- THE BULLETPROOF .ENV READER ---
-        // (Replaces the fragile parse_ini_file)
-        $env = [];
-        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            if (strpos(trim($line), '#') === 0) continue;
-            if (strpos($line, '=') !== false) {
-                list($name, $value) = explode('=', $line, 2);
-                $env[trim($name)] = trim($value, " \t\n\r\0\x0B\"");
-            }
-        }
-        
-        $this->url = $env['SUPABASE_URL'] ?? null;
-        $this->key = $env['SUPABASE_KEY'] ?? null;
-
+        // 2. LOCAL FALLBACK: If Render variables are empty, look for the .env file
         if (!$this->url || !$this->key) {
-            die("Configuration Error: SUPABASE_URL or SUPABASE_KEY is missing in .env");
+            $envPath = __DIR__ . '/../.env';
+            
+            if (!file_exists($envPath)) {
+                die("Configuration Error: No Server Variables found, and .env file is missing at $envPath");
+            }
+
+            // --- THE BULLETPROOF .ENV READER ---
+            $env = [];
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($name, $value) = explode('=', $line, 2);
+                    $env[trim($name)] = trim($value, " \t\n\r\0\x0B\"");
+                }
+            }
+            
+            $this->url = $env['SUPABASE_URL'] ?? null;
+            $this->key = $env['SUPABASE_KEY'] ?? null;
+        }
+
+        // Final sanity check
+        if (!$this->url || !$this->key) {
+            die("Configuration Error: SUPABASE_URL or SUPABASE_KEY is missing.");
         }
     }
 
@@ -40,7 +46,7 @@ class Supabase {
      * @return array ['code' => int, 'body' => array]
      */
     public function signUp($email, $password, $metaData = []) {
-        $endpoint = $this->url . '/auth/v1/signup';
+        $endpoint = rtrim($this->url, '/') . '/auth/v1/signup';
 
         // 2. Prepare the JSON Payload
         $data = [
@@ -88,7 +94,7 @@ class Supabase {
     } // End of signUp method
 
     public function signIn($email, $password) {
-        $endpoint = $this->url . '/auth/v1/token?grant_type=password';
+        $endpoint = rtrim($this->url, '/') . '/auth/v1/token?grant_type=password';
 
         $data = [
             'email' => $email,

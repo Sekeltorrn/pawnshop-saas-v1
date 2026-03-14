@@ -1,51 +1,59 @@
 <?php
 // config/db_connect.php
 
-// --- 0. EXTENSION CHECK (The "Direct Path" Strategy) ---
+// --- 0. EXTENSION CHECK (Local Linux Safeguard) ---
 if (!extension_loaded('pdo_pgsql')) {
-    // We try to tell PHP to look for the driver in the standard Linux location
-    // Note: 'dl' might be disabled, so we wrap it in a check
     if (function_exists('dl')) {
         @dl('pdo_pgsql.so');
     }
 }
 
-// 1. Locate the .env file in the root of your project
-$envPath = __DIR__ . '/../.env';
+// 1. CLOUD SMART CHECK: Try pulling from Render's Secure Vault first
+$host = getenv('DB_HOST');
+$port = getenv('DB_PORT') ?: '6543'; 
+$dbname = getenv('DB_NAME') ?: 'postgres';
+$user = getenv('DB_USER');
+$password = getenv('DB_PASS');
 
-if (!file_exists($envPath)) {
-    die("System Error: .env file not found at $envPath");
-}
-
-// 2. BULLETPROOF .ENV READER
-$env = [];
-$lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-foreach ($lines as $line) {
-    if (strpos(trim($line), '#') === 0) continue;
-    if (strpos($line, '=') !== false) {
-        list($name, $value) = explode('=', $line, 2);
-        $name = trim($name);
-        $value = trim($value, " \t\n\r\0\x0B\""); 
-        $env[$name] = $value;
+// 2. LOCAL FALLBACK: If Render variables are empty, we must be on your laptop
+if (!$host || !$user || !$password) {
+    $envPath = __DIR__ . '/../.env';
+    
+    if (!file_exists($envPath)) {
+        die("System Error: No Environment Variables found, and .env file is missing.");
     }
+
+    // BULLETPROOF .ENV READER
+    $env = [];
+    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos(trim($line), '#') === 0) continue;
+        if (strpos($line, '=') !== false) {
+            list($name, $value) = explode('=', $line, 2);
+            $name = trim($name);
+            $value = trim($value, " \t\n\r\0\x0B\""); 
+            $env[$name] = $value;
+        }
+    }
+
+    // Grab the local credentials
+    $host = $env['DB_HOST'] ?? '';
+    $port = $env['DB_PORT'] ?? '6543'; 
+    $dbname = $env['DB_NAME'] ?? 'postgres';
+    $user = $env['DB_USER'] ?? '';
+    $password = $env['DB_PASS'] ?? '';
 }
 
-// 3. Grab the Database Credentials
-$host = $env['DB_HOST'] ?? '';
-$port = $env['DB_PORT'] ?? '6543'; 
-$dbname = $env['DB_NAME'] ?? 'postgres';
-$user = $env['DB_USER'] ?? '';
-$password = $env['DB_PASS'] ?? '';
-
+// Final sanity check
 if (empty($host) || empty($user) || empty($password)) {
-    die("System Error: Missing database credentials in the .env file.");
+    die("System Error: Missing database credentials.");
 }
 
-// 4. Establish the Secure Connection
+// 3. Establish the Secure Connection
 try {
-    // We check again. If it's still not loaded, we stop here with a clear fix.
+    // We check again just to be safe
     if (!extension_loaded('pdo_pgsql')) {
-        throw new Exception("PHP Driver Missing: 'pdo_pgsql' is not installed for PHP 8.3.14. Please run 'sudo apt-get install php8.3-pgsql' in your terminal.");
+        throw new Exception("PHP Driver Missing: 'pdo_pgsql' is not installed. Please run 'sudo apt-get install php8.3-pgsql' in your local terminal.");
     }
 
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
