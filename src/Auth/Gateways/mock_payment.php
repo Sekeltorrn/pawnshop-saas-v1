@@ -28,9 +28,86 @@ try {
     ");
     $stmt->execute([$shopCode, $schemaName, $userId]);
 
-    // D. FORGE THE ISOLATED SCHEMA (The Private Database Folder)
-    // We use double quotes around schema names in PostgreSQL to be safe
+    // D. FORGE THE ISOLATED SCHEMA AND BUILD TABLES
+    // 1. Create the Schema
     $pdo->exec("CREATE SCHEMA IF NOT EXISTS \"$schemaName\"");
+    
+    // 2. Point all future queries to this new schema
+    $pdo->exec("SET search_path TO \"$schemaName\"");
+
+    // 3. The Master Table Builder
+    $sql = "
+        -- 2. CUSTOMERS (The People)
+        CREATE TABLE IF NOT EXISTS customers (
+            customer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            auth_user_id UUID UNIQUE, 
+            first_name VARCHAR(50) NOT NULL,
+            last_name VARCHAR(50) NOT NULL,
+            email VARCHAR(100) UNIQUE,
+            contact_no VARCHAR(20),
+            address TEXT,
+            id_type VARCHAR(50),
+            id_number VARCHAR(50),
+            id_image_url TEXT,
+            status VARCHAR(20) DEFAULT 'pending', 
+            is_walk_in BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+        );
+
+        -- 3. CATEGORIES (The Rules)
+        CREATE TABLE IF NOT EXISTS categories (
+            category_id SERIAL PRIMARY KEY,
+            category_name VARCHAR(50) UNIQUE NOT NULL,
+            default_interest_rate DECIMAL(5,2) DEFAULT 3.00
+        );
+
+        -- 4. INVENTORY (The Vault)
+        CREATE TABLE IF NOT EXISTS inventory (
+            item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            category_id INT REFERENCES categories(category_id),
+            item_name VARCHAR(255) NOT NULL,
+            item_description TEXT,
+            serial_number VARCHAR(100),
+            weight_grams DECIMAL(10,2),
+            appraised_value DECIMAL(15,2),
+            item_status VARCHAR(20) DEFAULT 'in_vault', 
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+        );
+
+        -- 5. LOANS (The Money)
+        CREATE TABLE IF NOT EXISTS loans (
+            loan_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            customer_id UUID REFERENCES customers(customer_id),
+            item_id UUID REFERENCES inventory(item_id),
+            pawn_ticket_no SERIAL,
+            principal_amount DECIMAL(15,2) NOT NULL,
+            interest_rate DECIMAL(5,2) NOT NULL,
+            loan_date DATE DEFAULT CURRENT_DATE,
+            due_date DATE NOT NULL,
+            status VARCHAR(20) DEFAULT 'active', 
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+        );
+
+        -- 6. PAYMENTS (The Audit Trail)
+        CREATE TABLE IF NOT EXISTS payments (
+            payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            loan_id UUID REFERENCES loans(loan_id),
+            amount DECIMAL(15,2) NOT NULL,
+            payment_date TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
+            payment_type VARCHAR(20), 
+            or_number VARCHAR(50) 
+        );
+
+        -- 7. DEFAULT DATA 
+        INSERT INTO categories (category_name, default_interest_rate) VALUES 
+        ('Jewelry (Gold)', 3.00),
+        ('Electronics', 5.00),
+        ('Luxury Watches', 2.50)
+        ON CONFLICT DO NOTHING;
+    ";
+
+    // Execute the massive table creation script
+    $pdo->exec($sql);
 
     // E. Commit the changes to the database!
     $pdo->commit();
@@ -49,8 +126,6 @@ try {
 }
 
 // 3. THE FRONTEND (The Cyberpunk Loading Sequence)
-// If the PHP reaches this point, the database is fully built. 
-// Now we just show them a cool animation before routing them to the dashboard.
 ?>
 <!DOCTYPE html>
 <html class="dark" lang="en">
@@ -110,6 +185,7 @@ try {
 
     <script>
         setTimeout(() => {
+            // Note: I adjusted this redirect path based on your folder structure screenshot
             window.location.href = 'views/adminboard/dashboard.php';
         }, 4000);
     </script>
