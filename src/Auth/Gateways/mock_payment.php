@@ -186,7 +186,7 @@ try {
     <script>
         setTimeout(() => {
             // Note: I adjusted this redirect path based on your folder structure screenshot
-            window.location.href = 'views/adminboard/dashboard.php';
+            window.location.href = '/views/adminboard/dashboard.php';
         }, 4000);
     </script>
 </body>
