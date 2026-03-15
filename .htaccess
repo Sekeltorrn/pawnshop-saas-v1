@@ -1,11 +1,16 @@
-RewriteEngine On
+# 1. Prevent people from seeing your file list
 Options -Indexes
 
-# 1. URL REWRITING: Mask the ugly PHP path
-# Turns: pawnereno.com/views/public/shop.php?code=marilao
-# Into:  pawnereno.com/shop/marilao
-RewriteRule ^shop/([a-zA-Z0-9_-]+)$ views/public/shop.php?code=$1 [L,QSA]
+# 2. Make sure your landing page is the first thing people see
+DirectoryIndex index.php
 
-# 2. SECURITY: Block public access to the config folder
-# Returns a 403 Forbidden if someone tries to look at your 
-RewriteRule ^config/.*$ - [F,L]
+# 3. Block access to sensitive files
+<Files ".env">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "db_connect.php">
+    Order allow,deny
+    Deny from all
+</Files>
