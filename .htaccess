@@ -1,0 +1,11 @@
+RewriteEngine On
+Options -Indexes
+
+# 1. URL REWRITING: Mask the ugly PHP path
+# Turns: pawnereno.com/views/public/shop.php?code=marilao
+# Into:  pawnereno.com/shop/marilao
+RewriteRule ^shop/([a-zA-Z0-9_-]+)$ views/public/shop.php?code=$1 [L,QSA]
+
+# 2. SECURITY: Block public access to the config folder
+# Returns a 403 Forbidden if someone tries to look at your 
+RewriteRule ^config/.*$ - [F,L]

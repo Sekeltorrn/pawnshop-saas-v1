@@ -44,6 +44,7 @@ try {
             first_name VARCHAR(50) NOT NULL,
             last_name VARCHAR(50) NOT NULL,
             email VARCHAR(100) UNIQUE,
+            password TEXT NULL,  
             contact_no VARCHAR(20),
             address TEXT,
             id_type VARCHAR(50),
