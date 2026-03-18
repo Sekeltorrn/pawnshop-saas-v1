@@ -26,6 +26,15 @@ try {
     
     $_SESSION['tenant_id'] = $shopData['id'];
 
+    // --- DYNAMIC URL GENERATOR ---
+    // Auto-detect if we are on localhost (http) or Render (https)
+    $protocol = isset($_SERVER['HTTP_X_FORWARDED_PROTO']) ? $_SERVER['HTTP_X_FORWARDED_PROTO'] : (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http');
+    $domain = $_SERVER['HTTP_HOST']; // Grabs '127.0.0.1:8000' OR 'pawnereno.onrender.com'
+    
+    // Build the full, exact URL based on where shop.php lives
+    $fullPublicUrl = $protocol . "://" . $domain . "/views/public/shop.php?code=" . $currentSlug;
+    // -----------------------------
+
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
 }
@@ -107,8 +116,9 @@ include '../../includes/header.php';
                             
                             <div class="p-6 bg-slate-950 rounded-2xl border border-slate-800 group hover:border-emerald-500/50 transition-all">
                                 <p class="text-[9px] text-slate-600 uppercase font-bold tracking-[0.2em] mb-3">Public Access URL</p>
-                                <a href="../../shop/<?= $currentSlug ?>" target="_blank" class="text-xl md:text-2xl text-emerald-400 hover:text-emerald-300 font-mono break-all transition-colors underline decoration-slate-800 underline-offset-8">
-                                    pawnereno.com/shop/<?= $currentSlug ?>
+                                
+                                <a href="<?= $fullPublicUrl ?>" target="_blank" class="text-xl md:text-[20px] text-emerald-400 hover:text-emerald-300 font-mono break-all transition-colors underline decoration-slate-800 underline-offset-8">
+                                    <?= $domain ?>/views/public/shop.php?code=<?= $currentSlug ?>
                                 </a>
                             </div>
 
