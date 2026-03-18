@@ -56,7 +56,7 @@ try {
         </div>
         <h1 class="text-2xl font-bold text-white mb-2"><?= htmlspecialchars($shop['shop_name']) ?></h1>
         <p class="text-slate-400 text-sm mb-8">Download our official app to track your loans and payments securely from your phone.</p>
-        <a href="/downloads/pawnereno_mobile.apk" class="block w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-900/50 mb-8">
+        <a href="/downloads/pawnereno.apk" download="pawnereno.apk" class="block w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-900/50 mb-8 text-center">
             Download Android APK
         </a>
         <div class="bg-slate-950 py-4 px-2 rounded-xl border border-slate-800">
