@@ -5,54 +5,66 @@ header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=UTF-8");
 
+// Handle Preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
 
-// 2. Capture Data
+// 2. Capture Data from Android App
 $inputData = json_decode(file_get_contents("php://input"), true);
-$email = $inputData['email'] ?? $_POST['email'] ?? '';
-$password = $inputData['password'] ?? $_POST['password'] ?? '';
 
-if (empty($email) || empty($password)) {
+$email      = $inputData['email'] ?? '';
+$password   = $inputData['password'] ?? '';
+$fullName   = $inputData['full_name'] ?? '';
+$phone      = $inputData['phone_number'] ?? '';
+$schemaName = $inputData['schema_name'] ?? '';
+
+// Basic Validation
+if (empty($email) || empty($password) || empty($schemaName)) {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Email and Password are required."]);
+    echo json_encode([
+        "status" => "error", 
+        "message" => "Email, Password, and Shop Schema are required."
+    ]);
     exit();
 }
 
-// 3. Supabase Credentials 
-// REPLACE THESE with your actual keys from Supabase Settings -> API
+// 3. Secure Credentials from Render Environment Variables
 $supabase_url = getenv('SUPABASE_URL'); 
-$api_key = getenv('SUPABASE_ANON_KEY');
+$api_key      = getenv('SUPABASE_ANON_KEY');
 
 // 4. Build Payload
+// We put name, phone, and schema inside 'data'. 
+// Supabase saves this as user_metadata which we can grab during verification.
 $payload = json_encode([
-    'email' => $email,
+    'email'    => $email,
     'password' => $password,
-    'data' => [
-        'role' => 'mobile_customer'
+    'data'     => [
+        'full_name'    => $fullName,
+        'phone_number' => $phone,
+        'schema_name'  => $schemaName,
+        'role'         => 'mobile_customer'
     ]
 ]);
 
-// 5. Initialize cURL
-// Using /auth/v1/signup to create the account and trigger the confirmation email
+// 5. Initialize cURL to Supabase Auth Signup
 $ch = curl_init($supabase_url . '/auth/v1/signup');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'apikey: ' . $api_key,
-    'Authorization: Bearer ' . $api_key, // Added this for better compatibility
+    'Authorization: Bearer ' . $api_key,
     'Content-Type: application/json'
 ]);
 
 $response = curl_exec($ch);
 $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$error = curl_error($ch);
+$error     = curl_error($ch);
 curl_close($ch);
 
-// 6. Detailed Response Handling
+// 6. Response Handling
 if ($error) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => "Connection Error: $error"]);
@@ -62,26 +74,30 @@ if ($error) {
 $result = json_decode($response, true);
 
 if ($http_code == 200 || $http_code == 201) {
-    // Check if Supabase actually created the user or if they need confirmation
+    
+    // Check if user already exists (Supabase returns empty identities for duplicates)
     if (isset($result['identities']) && empty($result['identities'])) {
+        http_response_code(400);
         echo json_encode([
             "status" => "error", 
-            "message" => "This email is already registered. Try logging in."
+            "message" => "This email is already registered. Please login instead."
         ]);
     } else {
+        // SUCCESS: The user is created in Auth (Pending) and Email is sent
+        // Note: WE DO NOT INSERT INTO THE DATABASE TABLE HERE. 
+        // That will happen in verify.php.
         echo json_encode([
-            "status" => "success", 
-            "message" => "Verification code sent! Check your Gmail (including Spam)."
+            "status"  => "success", 
+            "message" => "Verification code sent to $email"
         ]);
     }
 } else {
-    // This will now show you EXACTLY what Supabase is complaining about
-    $msg = $result['error_description'] ?? $result['msg'] ?? 'Unknown Supabase Error';
+    // Show exactly why Supabase rejected the request
+    $msg = $result['error_description'] ?? $result['msg'] ?? 'Registration failed';
     http_response_code($http_code);
     echo json_encode([
-        "status" => "error",
-        "message" => "Supabase Error: " . $msg,
-        "debug_code" => $http_code
+        "status"  => "error",
+        "message" => "Supabase Error: " . $msg
     ]);
 }
 ?>
