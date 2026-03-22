@@ -24,7 +24,7 @@ $supabase_url = getenv('SUPABASE_URL');
 $api_key = getenv('SUPABASE_ANON_KEY');
 
 try {
-    // --- ACTION 1: CONNECT TO SHOP ---
+    // --- ACTION 1: CONNECT TO SHOP (Handshake) ---
     if ($action === 'connect_shop') {
         $shop_code = $input['shop_code'] ?? '';
         
@@ -39,11 +39,11 @@ try {
                 "schema_name" => $shop['schema_name']
             ]);
         } else {
-            echo json_encode(["status" => "error", "message" => "Invalid Shop Code."]);
+            echo json_encode(["status" => "error", "message" => "Invalid Shop Code. Check the shop's website!"]);
         }
     }
 
-    // --- ACTION 2: REGISTER CUSTOMER (NOW WITH SUPABASE AUTH) ---
+    // --- ACTION 2: REGISTER CUSTOMER (SUPABASE AUTH HANDSHAKE) ---
     elseif ($action === 'register') {
         $tenant_schema = $input['schema_name'] ?? '';
         $full_name     = $input['full_name'] ?? '';
@@ -56,20 +56,24 @@ try {
             exit;
         }
 
-        // We package the shop-specific data into Supabase 'data' (metadata)
-        // This keeps the user's name/shop attached to their account while unverified
+        // SECURE: Hash the password NOW. 
+        // We will store this hash in Supabase metadata so verify.php can save it to the DB later.
+        $hashed_password = password_hash($raw_password, PASSWORD_DEFAULT);
+
+        // We package the shop-specific data AND the password hash into Supabase 'data'
         $payload = json_encode([
             'email'    => $email,
             'password' => $raw_password,
             'data'     => [
-                'full_name'    => $full_name,
-                'phone_number' => $phone,
-                'schema_name'  => $tenant_schema,
-                'role'         => 'mobile_customer'
+                'full_name'     => $full_name,
+                'phone_number'  => $phone,
+                'schema_name'   => $tenant_schema,
+                'password_hash' => $hashed_password, // STASHED FOR VERIFY.PHP
+                'role'          => 'mobile_customer'
             ]
         ]);
 
-        // Trigger Supabase Signup
+        // Trigger Supabase Signup (Starts the OTP flow)
         $ch = curl_init($supabase_url . '/auth/v1/signup');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
@@ -89,8 +93,7 @@ try {
             if (isset($result['identities']) && empty($result['identities'])) {
                 echo json_encode(["status" => "error", "message" => "This email is already registered."]);
             } else {
-                // SUCCESS: OTP is sent by Supabase.
-                // We DON'T insert into the DB yet. verify.php will do that.
+                // SUCCESS: User is created in Supabase Auth (Pending confirmation)
                 echo json_encode(["status" => "success", "message" => "Verification code sent! Check your email."]);
             }
         } else {
@@ -105,7 +108,6 @@ try {
         $email = $input['email'] ?? '';
         $raw_password = $input['password'] ?? '';
 
-        // Switch to the specific tenant schema to check approval status
         $pdo->exec("SET search_path TO \"$tenant_schema\"");
 
         $stmt = $pdo->prepare("SELECT * FROM customers WHERE email = ?");
@@ -113,13 +115,13 @@ try {
         $user = $stmt->fetch();
 
         if ($user) {
-            // Check Admin Approval Status first
+            // Check Admin Approval Status
             if ($user['status'] !== 'verified') {
                 echo json_encode(["status" => "error", "message" => "Account is still pending admin approval."]);
                 exit;
             }
             
-            // Verify Password locally (matches what was saved in verify.php)
+            // Verify the hashed password stored in your DB
             if (password_verify($raw_password, $user['password'])) {
                 echo json_encode([
                     "status" => "success",
@@ -132,10 +134,11 @@ try {
                 echo json_encode(["status" => "error", "message" => "Invalid email or password."]);
             }
         } else {
-            echo json_encode(["status" => "error", "message" => "User not found in this shop."]);
+            echo json_encode(["status" => "error", "message" => "Invalid email or password."]);
         }
     }
 
 } catch (PDOException $e) {
     echo json_encode(["status" => "error", "message" => "Database Error: " . $e->getMessage()]);
 }
+?>

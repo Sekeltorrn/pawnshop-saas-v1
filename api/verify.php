@@ -30,7 +30,7 @@ try {
 $inputData = json_decode(file_get_contents("php://input"), true);
 $email = $inputData['email'] ?? '';
 $code  = $inputData['code'] ?? '';
-$type  = $inputData['type'] ?? 'signup'; // 'signup' or 'recovery'
+$type  = $inputData['type'] ?? 'signup'; 
 
 if (empty($email) || empty($code)) {
     http_response_code(400);
@@ -67,57 +67,56 @@ $result = json_decode($response, true);
 // 5. Handle the Supabase Response
 if ($http_code == 200 && isset($result['access_token'])) {
     
-    // AUTH SUCCESS! 
-    // We only save to the customer table if this is a NEW SIGNUP
     if ($type === 'signup') {
         $user_id = $result['user']['id'];
         $metadata = $result['user']['user_metadata'] ?? [];
         
-        $fullName   = $metadata['full_name'] ?? 'Unknown User';
-        $phone      = $metadata['phone_number'] ?? '';
-        $schemaName = $metadata['schema_name'] ?? '';
+        $fullName     = $metadata['full_name'] ?? 'Unknown User';
+        $phone        = $metadata['phone_number'] ?? '';
+        $schemaName   = $metadata['schema_name'] ?? '';
+        $passwordHash = $metadata['password_hash'] ?? ''; // This is what we hashed in mobile_api.php
 
         if (empty($schemaName)) {
-            echo json_encode(["status" => "error", "message" => "Verified, but shop context was lost."]);
+            echo json_encode(["status" => "error", "message" => "Verified, but shop context missing."]);
             exit();
         }
 
-        // Split Name for your DB columns (First/Last)
+        // Split Name for your DB columns
         $name_parts = explode(' ', trim($fullName), 2);
         $first_name = $name_parts[0];
         $last_name  = $name_parts[1] ?? '';
 
         try {
             // 6. SAVE TO TENANT DATABASE
-            // We set status to 'pending' so they show up in your Admin Dashboard!
             $pdo->exec("SET search_path TO \"$schemaName\"");
             
-            $stmt = $pdo->prepare("INSERT INTO customers (auth_id, first_name, last_name, email, contact_no, is_walk_in, status) 
-                                   VALUES (:auth_id, :fname, :lname, :email, :phone, FALSE, 'pending')");
+            // SQL ADJUSTED TO YOUR SCHEMA: auth_user_id, contact_no, password
+            $stmt = $pdo->prepare("INSERT INTO customers (auth_user_id, first_name, last_name, email, contact_no, password, is_walk_in, status) 
+                                   VALUES (:auth_id, :fname, :lname, :email, :phone, :pass, FALSE, 'pending')");
             
             $stmt->execute([
                 ':auth_id' => $user_id,
                 ':fname'   => $first_name,
                 ':lname'   => $last_name,
                 ':email'   => $email,
-                ':phone'   => $phone
+                ':phone'   => $phone,
+                ':pass'    => $passwordHash, // Saving the hash so Login works later!
             ]);
 
             echo json_encode([
                 "status" => "success",
-                "message" => "User verified and added to $schemaName pending list!"
+                "message" => "Registration successful! Wait for admin approval."
             ]);
 
         } catch (PDOException $e) {
-            // If they are already in the table, just succeed (don't break the app)
+            // Unique Constraint Violation (Email or Auth ID already exists)
             if ($e->getCode() == '23505') {
-                echo json_encode(["status" => "success", "message" => "Welcome back!"]);
+                echo json_encode(["status" => "success", "message" => "Verification complete. Welcome back!"]);
             } else {
                 echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]);
             }
         }
     } else {
-        // This was a password reset or other type
         echo json_encode(["status" => "success", "message" => "Code verified!"]);
     }
 
