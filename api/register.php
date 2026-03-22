@@ -30,32 +30,36 @@ if (empty($email) || empty($password) || empty($schemaName)) {
     exit();
 }
 
-// 3. Secure Credentials from Render Environment Variables
+// 3. SECURE PASSWORD HASHING
+// We hash the password NOW because this is the only time we see the raw text.
+// verify.php will pull this hash from Supabase metadata and save it to your DB.
+$hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+// 4. Secure Credentials from Render Environment Variables
 $supabase_url = getenv('SUPABASE_URL'); 
 $api_key      = getenv('SUPABASE_ANON_KEY');
 
-// 4. Build Payload
-// We put name, phone, and schema inside 'data'. 
-// Supabase saves this as user_metadata which we can grab during verification.
+// 5. Build Payload
+// We "stash" the hashed password in the metadata so it survives until verification.
 $payload = json_encode([
     'email'    => $email,
     'password' => $password,
     'data'     => [
-        'full_name'    => $fullName,
-        'phone_number' => $phone,
-        'schema_name'  => $schemaName,
-        'role'         => 'mobile_customer'
+        'full_name'     => $fullName,
+        'phone_number'  => $phone,
+        'schema_name'   => $schemaName,
+        'password_hash' => $hashedPassword, // THE KEY FOR LOGIN SUCCESS
+        'role'          => 'mobile_customer'
     ]
 ]);
 
-// 5. Initialize cURL to Supabase Auth Signup
+// 6. Initialize cURL to Supabase Auth Signup
 $ch = curl_init($supabase_url . '/auth/v1/signup');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
     'apikey: ' . $api_key,
-    'Authorization: Bearer ' . $api_key,
     'Content-Type: application/json'
 ]);
 
@@ -64,7 +68,7 @@ $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $error     = curl_error($ch);
 curl_close($ch);
 
-// 6. Response Handling
+// 7. Response Handling
 if ($error) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => "Connection Error: $error"]);
@@ -75,7 +79,7 @@ $result = json_decode($response, true);
 
 if ($http_code == 200 || $http_code == 201) {
     
-    // Check if user already exists (Supabase returns empty identities for duplicates)
+    // Check if user already exists in Supabase Auth
     if (isset($result['identities']) && empty($result['identities'])) {
         http_response_code(400);
         echo json_encode([
@@ -83,16 +87,13 @@ if ($http_code == 200 || $http_code == 201) {
             "message" => "This email is already registered. Please login instead."
         ]);
     } else {
-        // SUCCESS: The user is created in Auth (Pending) and Email is sent
-        // Note: WE DO NOT INSERT INTO THE DATABASE TABLE HERE. 
-        // That will happen in verify.php.
+        // SUCCESS: OTP is sent. Database insert happens in verify.php
         echo json_encode([
             "status"  => "success", 
             "message" => "Verification code sent to $email"
         ]);
     }
 } else {
-    // Show exactly why Supabase rejected the request
     $msg = $result['error_description'] ?? $result['msg'] ?? 'Registration failed';
     http_response_code($http_code);
     echo json_encode([
