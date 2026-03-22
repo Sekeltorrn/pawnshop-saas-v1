@@ -34,6 +34,12 @@
             <span class="material-symbols-outlined text-lg">settings</span>
             Settings
         </a>
+
+        <a class="flex items-center gap-4 px-4 py-3 text-sm font-bold uppercase tracking-widest text-gray-400 hover:text-white transition-colors mt-4" href="logout.php">
+            <span class="material-symbols-outlined text-lg">logout</span>
+            Logout
+        </a>
+        
     </nav>
 
     <div class="p-6 border-t border-eva-purple/30">

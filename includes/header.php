@@ -1,4 +1,28 @@
 <?php
+// 1. START SESSION & CHECK AUTHENTICATION
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// If they are not logged in, kick them out to the login page
+if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
+    header("Location: /views/auth/login.php");
+    exit;
+}
+
+// 2. CONNECT TO DATABASE
+// (Adjust this path if your header.php is located somewhere else!)
+require_once __DIR__ . '/../config/db_connect.php';
+
+// 3. LISTEN FOR SUPER ADMIN BROADCASTS
+$global_announcement = '';
+try {
+    $stmt = $pdo->query("SELECT setting_value FROM public.platform_settings WHERE setting_key = 'global_announcement'");
+    $global_announcement = $stmt->fetchColumn();
+} catch (Exception $e) {
+    // Silently ignore if there's a DB blip so we don't break the UI
+}
+
 // Set a default page title if one isn't provided by the page loading this header
 $pageTitle = $pageTitle ?? 'Dashboard Overview';
 ?>
@@ -62,6 +86,13 @@ $pageTitle = $pageTitle ?? 'Dashboard Overview';
 
     <main class="flex-1 flex flex-col h-screen overflow-hidden relative w-full bg-deep-obsidian/95">
         
+        <?php if (!empty($global_announcement)): ?>
+        <div class="w-full bg-primary/90 text-background-dark font-bold px-4 py-2 flex items-center justify-center gap-3 z-50 shadow-[0_0_15px_rgba(255,106,0,0.4)]">
+            <span class="material-symbols-outlined animate-pulse">warning</span>
+            <span class="text-xs tracking-widest uppercase font-mono"><?= htmlspecialchars($global_announcement) ?></span>
+        </div>
+        <?php endif; ?>
+        
         <header class="lg:hidden sticky top-0 z-40 w-full border-b border-eva-purple/50 bg-background-dark/90 backdrop-blur-md px-4 py-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
                 <button class="text-neon-green material-symbols-outlined">menu</button>
@@ -77,21 +108,30 @@ $pageTitle = $pageTitle ?? 'Dashboard Overview';
                 <span class="text-xl font-bold tracking-tight text-white uppercase"><?php echo htmlspecialchars($pageTitle); ?></span>
             </div>
             <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 rounded text-xs text-gray-300 font-mono tracking-widest uppercase">
+                    <span class="material-symbols-outlined text-[14px] text-gray-400">database</span>
+                    <?= htmlspecialchars($_SESSION['schema_name'] ?? 'UNKNOWN_NODE') ?>
+                </div>
+
                 <div class="flex items-center gap-2 px-3 py-1 bg-eva-purple/20 border border-eva-purple/50 rounded text-xs text-gray-300">
                     <span class="w-2 h-2 bg-neon-green rounded-full animate-pulse"></span>
                     OPERATIONAL
                 </div>
-                <div class="text-sm text-gray-400 font-mono" id="current-time">
-                    <?php echo date('Y-m-d'); ?> <span class="text-primary"><?php echo date('H:i:s'); ?></span>
-                </div>
+                <div class="text-sm text-gray-400 font-mono" id="live-clock">
+                    </div>
             </div>
         </div>
 
         <div class="flex-1 overflow-y-auto hex-grid relative scroll-smooth p-4 lg:p-8">
             <div class="max-w-7xl mx-auto space-y-6">
-             
 
-
-</div> </div> </main>
-</body>
-</html>
+            <script>
+    function updateClock() {
+        const now = new Date();
+        const dateString = now.toISOString().split('T')[0];
+        const timeString = now.toTimeString().split(' ')[0];
+        document.getElementById('live-clock').innerHTML = `${dateString} <span class="text-primary font-bold">${timeString}</span>`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock(); // Run immediately on load
+</script>

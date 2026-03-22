@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mobile Auth Tester</title>
+</head>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; background: #121212; color: #e0e0e0; line-height: 1.6;">
+
+    <h1 style="color: #ff6a00; border-bottom: 2px solid #333; padding-bottom: 10px;">Pawnshop API Tester</h1>
+
+    <div style="display: flex; gap: 40px; margin-top: 20px;">
+        
+        <div style="flex: 1; background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333;">
+            <h2 style="color: #ff6a00; margin-top: 0;">1. Registration Test</h2>
+            <p style="font-size: 0.9em; color: #888;">This triggers the Supabase 6-digit email code.</p>
+            
+            <form action="api/register.php" method="POST" target="result_frame">
+                <label style="display:block; margin-bottom: 5px;">Email Address:</label>
+                <input type="email" name="email" placeholder="your-email@gmail.com" required 
+                       style="width: 90%; padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white;">
+                
+                <label style="display:block; margin-bottom: 5px;">Password:</label>
+                <input type="password" name="password" placeholder="Min 6 characters" required 
+                       style="width: 90%; padding: 12px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white;">
+                
+                <button type="submit" style="width: 100%; padding: 12px; background: #ff6a00; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; transition: 0.3s;">
+                    SEND VERIFICATION CODE
+                </button>
+            </form>
+        </div>
+
+        <div style="flex: 1; background: #1e1e1e; padding: 20px; border-radius: 12px; border: 1px solid #333;">
+            <h2 style="color: #00ff41; margin-top: 0;">2. Verification Test</h2>
+            <p style="font-size: 0.9em; color: #888;">Enter the code from your email here.</p>
+            
+            <form action="api/verify.php" method="POST" target="result_frame">
+                <label style="display:block; margin-bottom: 5px;">Email Address:</label>
+                <input type="email" name="email" placeholder="your-email@gmail.com" required 
+                       style="width: 90%; padding: 12px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white;">
+                
+                <label style="display:block; margin-bottom: 5px;">6-Digit Code:</label>
+                <input type="text" name="code" placeholder="000000" required 
+                       style="width: 90%; padding: 12px; margin-bottom: 20px; border-radius: 6px; border: 1px solid #444; background: #2a2a2a; color: white; letter-spacing: 5px; font-weight: bold; text-align: center;">
+                
+                <button type="submit" style="width: 100%; padding: 12px; background: #00ff41; border: none; border-radius: 6px; color: #000; font-weight: bold; cursor: pointer; transition: 0.3s;">
+                    VERIFY & CREATE USER
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <hr style="margin: 40px 0; border: 0; border-top: 1px solid #333;">
+    
+    <h3 style="color: #00b4ff;">Backend API Response:</h3>
+    <div style="background: #ffffff; border-radius: 8px; padding: 5px; border: 4px solid #00b4ff;">
+        <iframe name="result_frame" style="width: 100%; height: 250px; background: #ffffff; border: none; font-family: monospace;"></iframe>
+    </div>
+    <p style="font-size: 0.8em; color: #666; margin-top: 10px;">Note: If the box above is white, you can now clearly read the black text sent by PHP.</p>
+
+</body>
+</html>

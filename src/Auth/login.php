@@ -21,16 +21,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
-        // 2. Authenticate the user with Supabase
+        // --- NEW: THE SUPER ADMIN BOUNCER (Maintenance Mode Check) ---
+        // We do this before checking passwords to save API calls if the system is down!
+        $maint_stmt = $pdo->query("SELECT setting_value FROM public.platform_settings WHERE setting_key = 'maintenance_mode'");
+        $maintenance = $maint_stmt->fetchColumn();
+        
+        if ($maintenance === 'on') {
+            header("Location: /views/auth/login.php?error=" . urlencode("SYSTEM OFFLINE: Scheduled maintenance in progress."));
+            exit;
+        }
+        // --------------------------------------------------------------
+
+        // 2. Authenticate the user with Supabase API
         $supabase = new Supabase();
         $result = $supabase->signIn($email, $password);
 
         if ($result['code'] === 200) {
             
-            // 3. SUCCESS! Grab their unique user ID
+            // 3. SUCCESS! Grab their unique user ID from the Supabase Token
             $user_id = $result['body']['user']['id'];
 
-            // 4. THE TRAFFIC COP: Check the master tenants table
+            // 4. THE TRAFFIC COP: Check the master profiles table
             $stmt = $pdo->prepare("SELECT business_name, payment_status, schema_name, shop_code FROM public.profiles WHERE id = ?");
             $stmt->execute([$user_id]);
             $tenant = $stmt->fetch();
@@ -41,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['email'] = $email;
                 $_SESSION['business_name'] = $tenant['business_name'];
                 $_SESSION['payment_status'] = $tenant['payment_status'];
-                $_SESSION['schema_name'] = $tenant['schema_name'];
+                $_SESSION['schema_name'] = $tenant['schema_name']; // Critical for isolated DB queries!
                 $_SESSION['shop_code'] = $tenant['shop_code'];
                 $_SESSION['is_logged_in'] = true;
 
@@ -50,8 +61,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // They paid! Send them to their dashboard
                     header("Location: /views/adminboard/dashboard.php");
                     exit;
+                } elseif ($tenant['payment_status'] === 'suspended') {
+                    // --- NEW: THE KILL SWITCH ---
+                    // The Super Admin suspended them. Destroy the session and kick them out.
+                    session_destroy();
+                    header("Location: /views/auth/login.php?error=" . urlencode("ACCESS DENIED: Account suspended. Please resolve billing."));
+                    exit;
                 } else {
-                    // They haven't paid! Trap them in the Limbo Room
+                    // They haven't paid their initial bill yet! Trap them in the Limbo Room
                     header("Location: /views/auth/paywall.php");
                     exit;
                 }
