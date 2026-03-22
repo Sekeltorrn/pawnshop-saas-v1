@@ -10,7 +10,7 @@ if (!file_exists($dbPath)) {
 }
 require_once $dbPath;
 
-// 2. RECEIVE INPUT: Android sends data as a JSON package
+// 2. RECEIVE INPUT
 $input = json_decode(file_get_contents("php://input"), true);
 $action = $input['action'] ?? '';
 
@@ -19,8 +19,12 @@ if (!$action) {
     exit;
 }
 
+// 3. SECURE CREDENTIALS (Loaded from Render Environment Variables)
+$supabase_url = getenv('SUPABASE_URL'); 
+$api_key = getenv('SUPABASE_ANON_KEY');
+
 try {
-    // --- ACTION 1: CONNECT TO SHOP (Handshake) ---
+    // --- ACTION 1: CONNECT TO SHOP ---
     if ($action === 'connect_shop') {
         $shop_code = $input['shop_code'] ?? '';
         
@@ -35,39 +39,64 @@ try {
                 "schema_name" => $shop['schema_name']
             ]);
         } else {
-            echo json_encode(["status" => "error", "message" => "Invalid Shop Code. Check the shop's website!"]);
+            echo json_encode(["status" => "error", "message" => "Invalid Shop Code."]);
         }
     }
 
-    // --- ACTION 2: REGISTER CUSTOMER ---
+    // --- ACTION 2: REGISTER CUSTOMER (NOW WITH SUPABASE AUTH) ---
     elseif ($action === 'register') {
         $tenant_schema = $input['schema_name'] ?? '';
-        $full_name = $input['full_name'] ?? '';
-        $email = $input['email'] ?? '';
-        $phone = $input['phone_number'] ?? '';
-        $raw_password = $input['password'] ?? ''; 
+        $full_name     = $input['full_name'] ?? '';
+        $email         = $input['email'] ?? '';
+        $phone         = $input['phone_number'] ?? '';
+        $raw_password  = $input['password'] ?? ''; 
 
         if (empty($tenant_schema) || empty($email) || empty($raw_password)) {
-            echo json_encode(["status" => "error", "message" => "Missing shop context, email, or password."]);
+            echo json_encode(["status" => "error", "message" => "Missing required fields."]);
             exit;
         }
 
-        // Split name for database compatibility
-        $name_parts = explode(' ', trim($full_name), 2);
-        $first_name = $name_parts[0];
-        $last_name = $name_parts[1] ?? '';
+        // We package the shop-specific data into Supabase 'data' (metadata)
+        // This keeps the user's name/shop attached to their account while unverified
+        $payload = json_encode([
+            'email'    => $email,
+            'password' => $raw_password,
+            'data'     => [
+                'full_name'    => $full_name,
+                'phone_number' => $phone,
+                'schema_name'  => $tenant_schema,
+                'role'         => 'mobile_customer'
+            ]
+        ]);
 
-        // SECURE MVP: Hash the password locally before inserting
-        $hashed_password = password_hash($raw_password, PASSWORD_DEFAULT);
+        // Trigger Supabase Signup
+        $ch = curl_init($supabase_url . '/auth/v1/signup');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'apikey: ' . $api_key,
+            'Content-Type: application/json'
+        ]);
 
-        // SWITCH SCHEMA: This is the SaaS Magic
-        $pdo->exec("SET search_path TO \"$tenant_schema\"");
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-        // INSERT WITH THE HASHED PASSWORD
-        $stmt = $pdo->prepare("INSERT INTO customers (first_name, last_name, email, contact_no, password, is_walk_in, status) VALUES (?, ?, ?, ?, ?, FALSE, 'pending')");
-        $stmt->execute([$first_name, $last_name, $email, $phone, $hashed_password]);
+        $result = json_decode($response, true);
 
-        echo json_encode(["status" => "success", "message" => "Registration requested! Wait for admin approval."]);
+        if ($http_code == 200 || $http_code == 201) {
+            if (isset($result['identities']) && empty($result['identities'])) {
+                echo json_encode(["status" => "error", "message" => "This email is already registered."]);
+            } else {
+                // SUCCESS: OTP is sent by Supabase.
+                // We DON'T insert into the DB yet. verify.php will do that.
+                echo json_encode(["status" => "success", "message" => "Verification code sent! Check your email."]);
+            }
+        } else {
+            $msg = $result['error_description'] ?? $result['msg'] ?? 'Auth Failed';
+            echo json_encode(["status" => "error", "message" => "Supabase Error: $msg"]);
+        }
     }
 
     // --- ACTION 3: LOGIN ---
@@ -76,6 +105,7 @@ try {
         $email = $input['email'] ?? '';
         $raw_password = $input['password'] ?? '';
 
+        // Switch to the specific tenant schema to check approval status
         $pdo->exec("SET search_path TO \"$tenant_schema\"");
 
         $stmt = $pdo->prepare("SELECT * FROM customers WHERE email = ?");
@@ -83,13 +113,13 @@ try {
         $user = $stmt->fetch();
 
         if ($user) {
-            // Check if they are verified first
+            // Check Admin Approval Status first
             if ($user['status'] !== 'verified') {
                 echo json_encode(["status" => "error", "message" => "Account is still pending admin approval."]);
                 exit;
             }
             
-            // Verify the hashed password
+            // Verify Password locally (matches what was saved in verify.php)
             if (password_verify($raw_password, $user['password'])) {
                 echo json_encode([
                     "status" => "success",
@@ -102,15 +132,10 @@ try {
                 echo json_encode(["status" => "error", "message" => "Invalid email or password."]);
             }
         } else {
-            echo json_encode(["status" => "error", "message" => "Invalid email or password."]);
+            echo json_encode(["status" => "error", "message" => "User not found in this shop."]);
         }
     }
 
 } catch (PDOException $e) {
-    // 23505 is the PostgreSQL code for Unique Constraint Violation (Duplicate Email)
-    if ($e->getCode() == '23505') {
-        echo json_encode(["status" => "error", "message" => "This email is already registered at this shop."]);
-    } else {
-        echo json_encode(["status" => "error", "message" => "Database Error: " . $e->getMessage()]);
-    }
+    echo json_encode(["status" => "error", "message" => "Database Error: " . $e->getMessage()]);
 }
