@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $log_stmt = $pdo->prepare("INSERT INTO public.audit_logs (user_ip, action, status) VALUES (?, ?, ?)");
             $log_stmt->execute([$_SERVER['REMOTE_ADDR'] ?? 'Unknown', "Suspended tenant: $target_schema", 'SUCCESS']);
             
-            $message = "<div class='alert success'>SECURITY: Tenant <strong>$target_schema</strong> has been SUSPENDED.</div>";
+            $message = "<div class='mb-6 p-4 border border-error/50 bg-error/10 text-error font-label text-xs uppercase tracking-widest flex items-center gap-3'><span class='material-symbols-outlined'>warning</span>SECURITY: Node <strong>$target_schema</strong> has been SUSPENDED.</div>";
         } 
         elseif ($_POST['action'] === 'activate') {
             $stmt = $pdo->prepare("UPDATE public.profiles SET payment_status = 'active' WHERE schema_name = ?");
@@ -29,10 +29,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $log_stmt = $pdo->prepare("INSERT INTO public.audit_logs (user_ip, action, status) VALUES (?, ?, ?)");
             $log_stmt->execute([$_SERVER['REMOTE_ADDR'] ?? 'Unknown', "Reactivated tenant: $target_schema", 'SUCCESS']);
 
-            $message = "<div class='alert success'>SECURITY: Tenant <strong>$target_schema</strong> has been REACTIVATED.</div>";
+            $message = "<div class='mb-6 p-4 border border-primary/50 bg-primary/10 text-primary font-label text-xs uppercase tracking-widest flex items-center gap-3'><span class='material-symbols-outlined'>check_circle</span>SECURITY: Node <strong>$target_schema</strong> has been REACTIVATED.</div>";
         }
     } catch (PDOException $e) {
-        $message = "<div class='alert error'>Database Error: " . $e->getMessage() . "</div>";
+        $message = "<div class='mb-6 p-4 border border-error/50 bg-error/10 text-error font-label text-xs uppercase tracking-widest flex items-center gap-3'><span class='material-symbols-outlined'>error</span>Database Error: " . $e->getMessage() . "</div>";
     }
 }
 
@@ -91,150 +91,141 @@ try {
         }
 
         $tenants_data[] = [
-            'id' => $schema['id'], // Added ID to array
+            'id' => $schema['id'], 
             'schema_name' => $schema_name,
             'shop_name' => $shop_name,
             'customers' => $customer_count,
-            'plan' => 'STANDARD', 
+            'plan' => 'STANDARD_TIER', 
             'status' => $status,
             'days_left' => $days_left,
             'vault_value' => "$" . number_format($vault_value, 2)
         ];
     }
 } catch (PDOException $e) {
-    $message = "<div class='alert error'>Database Error: " . $e->getMessage() . "</div>";
+    $message = "<div class='mb-6 p-4 border border-error/50 bg-error/10 text-error font-label text-xs uppercase tracking-widest flex items-center gap-3'><span class='material-symbols-outlined'>error</span>Database Error: " . $e->getMessage() . "</div>";
 }
 ?>
 
-<style>
-    .header-flex { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 20px; }
-    
-    .data-table { width: 100%; border-collapse: collapse; background: var(--bg-card); border-radius: 8px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    .data-table th, .data-table td { padding: 15px; text-align: left; border-bottom: 1px solid var(--border); }
-    .data-table th { background: #0f172a; color: var(--text-muted); text-transform: uppercase; font-size: 12px; letter-spacing: 1px; }
-    .data-table tr:hover { background: #334155; }
-    
-    .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; }
-    .badge-active { background: #064e3b; color: #34d399; }
-    .badge-suspended { background: #7f1d1d; color: #fca5a5; }
-    .badge-warning { background: #78350f; color: #fbbf24; }
-    .badge-neutral { background: #334155; color: #cbd5e1; }
-    
-    .btn-action { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; text-transform: uppercase; }
-    .btn-suspend { background: #ef4444; color: white; }
-    .btn-suspend:hover { background: #dc2626; }
-    .btn-activate { background: #10b981; color: white; }
-    .btn-activate:hover { background: #059669; }
-
-    .alert { padding: 15px; margin-bottom: 20px; border-radius: 4px; font-family: monospace; }
-    .alert.success { background: #064e3b; color: #a7f3d0; border: 1px solid #059669; }
-    .alert.error { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
-</style>
-
-<div class="header-flex">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
     <div>
-        <h1 style="margin: 0; color: var(--accent);">Tenant Oversight & Control</h1>
-        <p style="color: var(--text-muted); margin: 5px 0 0 0; font-size: 14px;">Monitor subscription health and enforce access controls.</p>
+        <p class="font-label text-[10px] uppercase tracking-[0.2em] text-primary-fixed-dim mb-1">Module: Identity_Management</p>
+        <h1 class="font-headline text-3xl md:text-4xl font-bold tracking-tight text-on-surface">TENANT_REGISTRY</h1>
+        <p class="font-body text-xs text-on-surface-variant mt-2">Monitor subscription health and enforce node access controls.</p>
     </div>
-    <div style="background: var(--bg-card); padding: 10px 20px; border-radius: 4px; border: 1px solid var(--border);">
-        <span style="color: var(--text-muted); font-size: 12px; text-transform: uppercase;">Total Active Tenants</span>
-        <div style="font-size: 24px; font-weight: bold; color: white;"><?= count($schemas) ?></div>
+    <div class="flex gap-4 items-center">
+        <div class="bg-surface-container-highest px-6 py-3 border border-outline-variant/20">
+            <span class="font-label text-[10px] uppercase tracking-widest text-outline block mb-1">Active Nodes</span>
+            <span class="font-headline text-xl font-bold text-primary"><?= count($schemas) ?></span>
+        </div>
     </div>
 </div>
 
 <?= $message ?>
 
-<div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
-    <input type="text" id="tenantSearch" placeholder="🔍 Search pawnshops by name, code, or status..." 
-           style="width: 100%; max-width: 400px; padding: 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-dark); color: white; font-family: monospace; outline: none;">
+<div class="mb-8 relative group">
+    <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-outline group-focus-within:text-primary transition-colors">search</span>
+    <input type="text" id="tenantSearch" placeholder="SEARCH NODES BY NAME OR SCHEMA_ID..." 
+           class="w-full bg-surface-container-low border border-outline-variant/30 focus:border-primary/50 focus:ring-0 text-on-surface font-mono py-4 pl-12 pr-4 placeholder-outline/50 transition-all outline-none">
 </div>
 
-<table class="data-table">
-    <thead>
-        <tr>
-            <th>Pawnshop</th>
-            <th>Database Schema</th>
-            <th>Total Customers</th>
-            <th>Vault Value (Est)</th>
-            <th>Sub. Status</th>
-            <th>Time Remaining</th>
-            <th>Access Control</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php if (empty($tenants_data)): ?>
-            <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">No active tenant databases found.</td></tr>
-        <?php else: ?>
-            <?php foreach ($tenants_data as $tenant): ?>
-                <tr>
-                    <td style="color: white; font-weight: bold;">
-                        <?= htmlspecialchars($tenant['shop_name']) ?>
-                    </td>
-                    <td style="font-family: monospace; color: var(--accent);">
-                        <?= htmlspecialchars($tenant['schema_name']) ?>
-                    </td>
-                    <td style="font-weight: bold; color: #cbd5e1;"><?= $tenant['customers'] ?></td>
-                    <td style="color: #94a3b8;"><?= $tenant['vault_value'] ?></td>
-                    
-                    <td>
-                        <?php if ($tenant['status'] === 'active'): ?>
-                            <span class="badge badge-active">Active</span>
-                        <?php elseif ($tenant['status'] === 'suspended' || $tenant['status'] === 'past_due'): ?>
-                            <span class="badge badge-suspended">Suspended</span>
-                        <?php else: ?>
-                            <span class="badge badge-neutral"><?= htmlspecialchars($tenant['status']) ?></span>
-                        <?php endif; ?>
-                    </td>
-
-                    <td>
-                        <?php if ($tenant['days_left'] === 'N/A'): ?>
-                            <span style="color: #94a3b8; font-size: 13px;">Unknown</span>
-                        <?php elseif ($tenant['status'] === 'suspended' || $tenant['status'] === 'past_due'): ?>
-                            <span style="color: #ef4444; font-size: 13px;">Past Due</span>
-                        <?php elseif ($tenant['days_left'] <= 5): ?>
-                            <span class="badge badge-warning"><?= $tenant['days_left'] ?> Days Left</span>
-                        <?php else: ?>
-                            <span style="color: #94a3b8; font-size: 13px;"><?= $tenant['days_left'] ?> Days</span>
-                        <?php endif; ?>
-                    </td>
-
-                    <td style="display: flex; gap: 8px; align-items: center;">
-                        <a href="tenant_profile.php?id=<?= $tenant['id'] ?>" 
-                           style="background: transparent; border: 1px solid #38bdf8; color: #38bdf8; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-size: 11px; font-weight: bold; text-transform: uppercase; transition: 0.2s;">
-                           👁️ View
-                        </a>
-                        
-                        <form method="POST" action="tenants.php" style="margin: 0;">
-                            <input type="hidden" name="schema_name" value="<?= $tenant['schema_name'] ?>">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tenantGrid">
+    <?php if (empty($tenants_data)): ?>
+        <div class="col-span-full border-2 border-dashed border-outline-variant/20 flex flex-col items-center justify-center p-12">
+            <span class="material-symbols-outlined text-outline text-4xl mb-4">cloud_off</span>
+            <span class="font-label text-xs uppercase tracking-[0.2em] text-outline">No active tenant databases found.</span>
+        </div>
+    <?php else: ?>
+        <?php foreach ($tenants_data as $tenant): ?>
+            <div class="tenant-card bg-surface-container-low group hover:bg-surface-bright transition-all duration-300 relative border border-outline-variant/10 flex flex-col h-full" data-search="<?= strtolower($tenant['shop_name'] . ' ' . $tenant['schema_name']) ?>">
+                
+                <div class="p-6 border-b border-outline-variant/10 flex-grow">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-12 h-12 bg-surface-container-highest flex items-center justify-center">
                             <?php if ($tenant['status'] === 'active'): ?>
-                                <input type="hidden" name="action" value="suspend">
-                                <button type="submit" class="btn-action btn-suspend">Suspend</button>
+                                <span class="material-symbols-outlined text-primary-fixed-dim">business</span>
+                            <?php elseif ($tenant['status'] === 'suspended' || $tenant['status'] === 'past_due'): ?>
+                                <span class="material-symbols-outlined text-error">warning</span>
                             <?php else: ?>
-                                <input type="hidden" name="action" value="activate">
-                                <button type="submit" class="btn-action btn-activate">Activate</button>
+                                <span class="material-symbols-outlined text-secondary">apartment</span>
                             <?php endif; ?>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-        <?php endif; ?>
-    </tbody>
-</table>
+                        </div>
+                        
+                        <?php if ($tenant['status'] === 'active'): ?>
+                            <span class="px-2 py-1 bg-primary-container/10 text-primary-container font-label text-[9px] uppercase tracking-widest font-bold border border-primary-container/20">ACTIVE</span>
+                        <?php elseif ($tenant['status'] === 'suspended' || $tenant['status'] === 'past_due'): ?>
+                            <span class="px-2 py-1 bg-error-container/30 text-error font-label text-[9px] uppercase tracking-widest font-bold border border-error/20">SUSPENDED</span>
+                        <?php else: ?>
+                            <span class="px-2 py-1 bg-secondary-container/20 text-secondary font-label text-[9px] uppercase tracking-widest font-bold border border-secondary/20"><?= strtoupper($tenant['status']) ?></span>
+                        <?php endif; ?>
+                    </div>
+
+                    <h3 class="font-headline text-lg font-bold text-on-surface tracking-tight mb-1 truncate"><?= htmlspecialchars($tenant['shop_name']) ?></h3>
+                    <p class="font-mono text-xs text-primary/70 mb-4 truncate">ID: <?= htmlspecialchars($tenant['schema_name']) ?></p>
+
+                    <div class="grid grid-cols-2 gap-4 mt-6 bg-[#111318] p-3 border border-outline-variant/5">
+                        <div>
+                            <p class="font-label text-[9px] text-outline uppercase tracking-widest mb-1">Customers</p>
+                            <p class="font-headline text-sm font-bold text-on-surface"><?= $tenant['customers'] ?></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-label text-[9px] text-outline uppercase tracking-widest mb-1">Vault Est.</p>
+                            <p class="font-headline text-sm font-bold text-on-surface"><?= $tenant['vault_value'] ?></p>
+                        </div>
+                        <div>
+                            <p class="font-label text-[9px] text-outline uppercase tracking-widest mb-1">Plan</p>
+                            <p class="font-headline text-xs font-bold text-secondary"><?= $tenant['plan'] ?></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-label text-[9px] text-outline uppercase tracking-widest mb-1">Time Left</p>
+                            <?php if ($tenant['days_left'] === 'N/A'): ?>
+                                <p class="font-headline text-xs font-bold text-outline">UNKNOWN</p>
+                            <?php elseif ($tenant['status'] === 'suspended' || $tenant['status'] === 'past_due'): ?>
+                                <p class="font-headline text-xs font-bold text-error">PAST DUE</p>
+                            <?php elseif ($tenant['days_left'] <= 5): ?>
+                                <p class="font-headline text-xs font-bold text-[#fbbf24]"><?= $tenant['days_left'] ?> DAYS</p>
+                            <?php else: ?>
+                                <p class="font-headline text-xs font-bold text-primary-fixed-dim"><?= $tenant['days_left'] ?> DAYS</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex w-full mt-auto">
+                    <a href="tenant_profile.php?id=<?= $tenant['id'] ?>" class="flex-1 py-3 font-label text-[10px] uppercase tracking-widest border-r border-outline-variant/10 hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center gap-2 text-on-surface-variant">
+                        <span class="material-symbols-outlined text-xs">manage_accounts</span> MANAGE_NODE
+                    </a>
+
+                    <form method="POST" action="tenants.php" class="flex-1 flex m-0">
+                        <input type="hidden" name="schema_name" value="<?= $tenant['schema_name'] ?>">
+                        <?php if ($tenant['status'] === 'active'): ?>
+                            <input type="hidden" name="action" value="suspend">
+                            <button type="submit" class="w-full py-3 font-label text-[10px] uppercase tracking-widest hover:bg-error-container/20 hover:text-error transition-colors flex items-center justify-center gap-2 text-on-surface-variant">
+                                <span class="material-symbols-outlined text-xs">block</span> DEACTIVATE
+                            </button>
+                        <?php else: ?>
+                            <input type="hidden" name="action" value="activate">
+                            <button type="submit" class="w-full py-3 font-label text-[10px] uppercase tracking-widest hover:bg-primary/10 text-primary transition-colors flex items-center justify-center gap-2 bg-primary/5">
+                                <span class="material-symbols-outlined text-xs">restore</span> ACTIVATE
+                            </button>
+                        <?php endif; ?>
+                    </form>
+                </div>
+            </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
+</div>
 
 <script>
     document.getElementById('tenantSearch').addEventListener('keyup', function() {
         let searchQuery = this.value.toLowerCase();
-        let tableRows = document.querySelectorAll('.data-table tbody tr');
+        let cards = document.querySelectorAll('.tenant-card');
 
-        tableRows.forEach(row => {
-            // Check if it's the "No active tenants" row to avoid hiding it if table is empty
-            if (row.cells.length === 1) return; 
-
-            let rowText = row.innerText.toLowerCase();
-            if(rowText.includes(searchQuery)) {
-                row.style.display = ''; // Show row
+        cards.forEach(card => {
+            let searchableText = card.getAttribute('data-search');
+            if(searchableText.includes(searchQuery)) {
+                card.style.display = 'flex'; 
             } else {
-                row.style.display = 'none'; // Hide row
+                card.style.display = 'none'; 
             }
         });
     });
