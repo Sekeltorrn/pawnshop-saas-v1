@@ -51,8 +51,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // E. Check the Result
         if ($result['code'] === 200 || $result['code'] === 201) {
             
+            // SAFETY CHECK: Supabase returns a fake 200 OK response if the email already exists
+            // to prevent hackers from guessing emails. We must verify the user object actually exists.
+            $userId = $result['body']['user']['id'] ?? $result['body']['id'] ?? null;
+
+            if (!$userId) {
+                // Supabase returned success, but no user data. The email is likely already taken.
+                header("Location: /views/auth/signup.php?error=" . urlencode("This email is already registered. Please log in."));
+                exit;
+            }
+
             // Auto-login the user into the PHP Session
-            $_SESSION['user_id'] = $result['body']['user']['id'];
+            $_SESSION['user_id'] = $userId;
             $_SESSION['email'] = $email;
             $_SESSION['business_name'] = $businessName;
             
@@ -66,7 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         } else {
             // F. Handle Supabase Errors
+            // Added an extra ['message'] fallback just to be safe with Supabase API formats
             $errorMessage = $result['body']['msg'] 
+                         ?? $result['body']['message']
                          ?? $result['body']['error_description'] 
                          ?? 'Registration failed. Please try again.';
             
