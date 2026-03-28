@@ -86,7 +86,7 @@ function calculateDynamicInterest($principal, $loan_date, $due_date_override = n
 $recent_online_payments = [];
 try {
     $stmt = $pdo->prepare("
-        SELECT p.*, l.pawn_ticket_number, c.first_name, c.last_name 
+        SELECT p.*, l.pawn_ticket_no, c.first_name, c.last_name 
         FROM {$tenant_schema}.payments p
         JOIN {$tenant_schema}.loans l ON p.loan_id = l.loan_id
         JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id
@@ -101,7 +101,7 @@ try {
 $active_loans = [];
 try {
     $stmt = $pdo->prepare("
-        SELECT l.pawn_ticket_number, l.due_date, i.item_name, c.first_name, c.last_name 
+        SELECT l.pawn_ticket_no, l.due_date, i.item_name, c.first_name, c.last_name 
         FROM {$tenant_schema}.loans l 
         LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id 
         LEFT JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
@@ -126,7 +126,7 @@ if (isset($_GET['select_ticket']) || isset($_GET['search_ticket'])) {
             FROM {$tenant_schema}.loans l 
             LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id
             JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
-            WHERE l.pawn_ticket_number = ?
+            WHERE l.pawn_ticket_no = ?
         ");
         
         $padded_ticket = str_pad($ticket_num, 5, '0', STR_PAD_LEFT);
@@ -190,7 +190,7 @@ include '../../includes/header.php';
                                     <span class="text-[9px] font-black text-[#ff6b00] bg-[#ff6b00]/10 border border-[#ff6b00]/20 px-1.5 py-0.5 uppercase tracking-wider">PayMongo</span>
                                 </div>
                                 <div class="flex justify-between mt-2">
-                                    <span class="text-[10px] text-slate-500 font-mono">PT-<?= str_pad($p['pawn_ticket_number'], 5, '0', STR_PAD_LEFT) ?></span>
+                                    <span class="text-[10px] text-slate-500 font-mono">PT-<?= str_pad($p['pawn_ticket_no'], 5, '0', STR_PAD_LEFT) ?></span>
                                     <span class="text-white font-mono font-bold text-xs">₱<?= number_format($p['amount'], 2) ?></span>
                                 </div>
                             </div>
@@ -222,9 +222,9 @@ include '../../includes/header.php';
                     <?php else: ?>
                         <?php foreach ($active_loans as $l): 
                             $is_overdue = (strtotime($l['due_date']) < time());
-                            $ticket_str = 'PT-' . str_pad($l['pawn_ticket_number'], 5, '0', STR_PAD_LEFT);
+                            $ticket_str = 'PT-' . str_pad($l['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
                         ?>
-                            <a href="?select_ticket=<?= $l['pawn_ticket_number'] ?>" class="block p-3 bg-[#0a0b0d] hover:bg-[#00ff41]/10 hover:border-[#00ff41]/30 transition-all border border-white/5 group/item">
+                            <a href="?select_ticket=<?= $l['pawn_ticket_no'] ?>" class="block p-3 bg-[#0a0b0d] hover:bg-[#00ff41]/10 hover:border-[#00ff41]/30 transition-all border border-white/5 group/item">
                                 <div class="flex justify-between items-center mb-2">
                                     <span class="text-[#00ff41] font-mono text-xs font-bold tracking-tight"><?= $ticket_str ?></span>
                                     <?php if ($is_overdue): ?>
@@ -266,7 +266,7 @@ include '../../includes/header.php';
                         $redemption_total = $base_redeem + (($months - 1) * $monthly_inc) + $SERVICE_CHARGE;
                     }
 
-                    $ticket_str = 'PT-' . str_pad($loan_data['pawn_ticket_number'], 5, '0', STR_PAD_LEFT);
+                    $ticket_str = 'PT-' . str_pad($loan_data['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
                     
                     $now = time();
                     $due = strtotime($loan_data['due_date']);

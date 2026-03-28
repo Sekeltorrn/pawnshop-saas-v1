@@ -71,36 +71,31 @@ try {
         $intent = $parts[2] ?? 'RENEW'; 
         $tenant_schema = 'tenant_pwn_18e601'; 
 
-        $stmt = $pdo->prepare("SELECT loan_id FROM {$tenant_schema}.loans WHERE pawn_ticket_number = ?");
-        $padded_ticket = str_pad($ticket_num_string, 5, '0', STR_PAD_LEFT);
+        // 1. Fetch using the CORRECT column name: pawn_ticket_no
+        $stmt = $pdo->prepare("SELECT loan_id FROM {$tenant_schema}.loans WHERE pawn_ticket_no = ?");
         
         $stmt->execute([$ticket_num_string]);
         $loan = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$loan) {
-            $stmt->execute([$padded_ticket]);
-            $loan = $stmt->fetch(PDO::FETCH_ASSOC);
-        }
 
         if ($loan) {
             $loan_id = $loan['loan_id'];
             
-            // BULLETPROOF OLD-SCHOOL PHP (Replaced PHP 8 match function)
-            $pay_type = 'interest'; // Default
-            if ($intent === 'REDEEM') {
-                $pay_type = 'full_redemption';
-            } elseif ($intent === 'PARTIAL') {
-                $pay_type = 'principal';
-            }
-            
-            // Insert Payment
+            // 2. Insert Payment
             $pay_stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.payments (loan_id, amount, payment_type, reference_number) VALUES (?, ?, ?, ?)");
+            $pay_type = ($intent === 'REDEEM') ? 'full_redemption' : (($intent === 'PARTIAL') ? 'principal' : 'interest');
             $pay_stmt->execute([$loan_id, $amount_paid_php, $pay_type, $reference_number]);
 
-            // Update Status
+            // 3. Update Status AND EXTEND DUE DATE BY 1 MONTH
             $new_status = ($intent === 'REDEEM') ? 'redeemed' : 'renewed';
-            $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
-            $upd_stmt->execute([$new_status, $loan_id]);
+            
+            if ($intent === 'REDEEM') {
+                $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
+                $upd_stmt->execute([$new_status, $loan_id]);
+            } else {
+                // This is the "Pawnshop Rule": Renewal adds exactly 1 month to the due date
+                $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ?, due_date = due_date + INTERVAL '1 month' WHERE loan_id = ?");
+                $upd_stmt->execute([$new_status, $loan_id]);
+            }
         }
     }
 

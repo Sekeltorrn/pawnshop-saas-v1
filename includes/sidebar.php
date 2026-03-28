@@ -32,6 +32,11 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
             Ledger
         </a>
 
+        <a class="<?= $base_class ?> <?= ($current_page == 'history.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/history.php">
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'history.php') ? $active_icon : $inactive_icon ?>">inventory_2</span>
+            Transactions
+        </a>
+
         <a href="payments.php" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-[#00ff41] transition-all group">
             <span class="material-symbols-outlined text-lg group-hover:text-[#00ff41] transition-colors">point_of_sale</span>
             <span class="text-[10px] font-black uppercase tracking-widest">Payment Node</span>
