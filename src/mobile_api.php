@@ -126,6 +126,8 @@ try {
                 echo json_encode([
                     "status" => "success",
                     "user" => [
+                        "id" => $user['customer_id'],          // 🔴 WE ADDED THIS!
+                        "customer_id" => $user['customer_id'], // 🔴 Added this too just to be perfectly safe!
                         "email" => $user['email'],
                         "fullName" => $user['first_name'] . " " . $user['last_name']
                     ]
