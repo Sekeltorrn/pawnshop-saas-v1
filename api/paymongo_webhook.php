@@ -79,7 +79,7 @@ try {
         $tenant_schema = 'tenant_pwn_18e601'; // Ensure this matches your live schema
 
         // 1. Fetch the exact loan_id using the correct column name
-        $stmt = $pdo->prepare("SELECT loan_id, customer_id FROM {$tenant_schema}.loans WHERE pawn_ticket_number = ?");
+        $stmt = $pdo->prepare("SELECT loan_id FROM {$tenant_schema}.loans WHERE pawn_ticket_number = ?");
         
         // Sometimes PayMongo sends the reference as PT-00123 instead of PT-123. Let's check both!
         $padded_ticket = str_pad($ticket_num_string, 5, '0', STR_PAD_LEFT);
@@ -92,16 +92,12 @@ try {
             $stmt->execute([$padded_ticket]);
             $loan = $stmt->fetch(PDO::FETCH_ASSOC);
         }
-        
-        // Ensure the ticket format is also correct for the update
-        $ticket_to_update = $loan ? $loan['pawn_ticket_number'] : $ticket_num_string;
 
         if ($loan) {
             $loan_id = $loan['loan_id'];
-            $customer_id = $loan['customer_id'];
             
-            // 2. Insert into the Payments Ledger using loan_id
-            $pay_stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.payments (loan_id, customer_id, amount, payment_type, payment_method, status, payment_date, reference_number) VALUES (?, ?, ?, ?, ?, 'confirmed', NOW(), ?)");
+            // 2. Insert into the Payments Ledger using ONLY the columns that exist in your schema
+            $pay_stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.payments (loan_id, amount, payment_type, reference_number) VALUES (?, ?, ?, ?)");
             
             $pay_type = match($intent) {
                 'REDEEM' => 'full_redemption',
@@ -109,12 +105,12 @@ try {
                 default => 'interest'
             };
 
-            $pay_stmt->execute([$loan_id, $customer_id, $amount_paid_php, $pay_type, $payment_method, $reference_number]);
+            $pay_stmt->execute([$loan_id, $amount_paid_php, $pay_type, $reference_number]);
 
             // 3. Update the Vault Asset Status
             $new_status = ($intent === 'REDEEM') ? 'redeemed' : 'renewed';
             $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
-            $upd_stmt->execute([$new_status, $loan['loan_id']]);
+            $upd_stmt->execute([$new_status, $loan_id]);
         }
     }
 
