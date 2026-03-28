@@ -28,12 +28,25 @@ try {
     $displayShopName = $shopData['shop_name'] ?? 'My Pawnshop';
     $_SESSION['tenant_id'] = $shopData['id'];
 
-    // For the demo, we are using the schema we built earlier. 
-    // In the future, make this dynamic: $tenant_schema = 'tenant_' . $shopData['shop_slug'];
     $tenant_schema = 'tenant_pwn_18e601'; 
 
-    // --- NEW: FETCH THE ACTUAL LEDGER DATA ---
-    // We join Loans, Inventory, and Customers together
+    // --- CALCULATE LIVE DASHBOARD METRICS ---
+    $metricsStmt = $pdo->prepare("
+        SELECT 
+            COALESCE(SUM(CASE WHEN status = 'active' THEN principal_amount ELSE 0 END), 0) as active_principal,
+            COALESCE(SUM(CASE WHEN DATE(created_at) = CURRENT_DATE THEN principal_amount ELSE 0 END), 0) as daily_volume,
+            COUNT(CASE WHEN status = 'active' AND due_date <= CURRENT_DATE + INTERVAL '3 days' THEN 1 END) as expiring_count
+        FROM {$tenant_schema}.loans
+    ");
+    $metricsStmt->execute();
+    $metrics = $metricsStmt->fetch(PDO::FETCH_ASSOC);
+
+    $metric_active_principal = number_format($metrics['active_principal'], 2);
+    $metric_daily_volume = number_format($metrics['daily_volume'], 2);
+    $metric_expiring_count = $metrics['expiring_count'];
+
+
+    // --- FETCH THE ACTUAL LEDGER DATA ---
     $ledgerQuery = "
         SELECT 
             l.pawn_ticket_no, 
@@ -88,34 +101,35 @@ include '../../includes/header.php';
         <div class="bg-[#141518] border border-white/5 p-5 border-l-2 border-l-purple-500 relative overflow-hidden group">
             <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-6xl text-purple-500/10 group-hover:scale-110 transition-transform">account_balance_wallet</span>
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Capital_Deployed</p>
-            <h3 class="text-2xl font-black text-white font-display">₱1,245,000<span class="text-sm text-slate-500">.00</span></h3>
+            <h3 class="text-2xl font-black text-white font-display">₱<?= $metric_active_principal ?></h3>
             <p class="text-[8px] text-purple-400 font-mono uppercase mt-2">Active Principal Balance</p>
         </div>
 
         <div class="bg-[#141518] border border-white/5 p-5 border-l-2 border-l-[#00ff41] relative overflow-hidden group">
             <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-6xl text-[#00ff41]/10 group-hover:scale-110 transition-transform">payments</span>
-            <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Daily_Collection</p>
-            <h3 class="text-2xl font-black text-[#00ff41] font-display">₱42,500<span class="text-sm text-[#00ff41]/50">.00</span></h3>
-            <p class="text-[8px] text-[#00ff41]/70 font-mono uppercase mt-2">+12.4% vs Yesterday</p>
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Daily_Volume</p>
+            <h3 class="text-2xl font-black text-[#00ff41] font-display">₱<?= $metric_daily_volume ?></h3>
+            <p class="text-[8px] text-[#00ff41]/70 font-mono uppercase mt-2">New Loans Issued Today</p>
         </div>
 
         <div class="bg-[#141518] border border-white/5 p-5 border-l-2 border-l-[#ff6b00] relative overflow-hidden group">
             <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-6xl text-[#ff6b00]/10 group-hover:scale-110 transition-transform">warning</span>
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Expiring_Tickets</p>
-            <h3 class="text-2xl font-black text-white font-display">18 <span class="text-sm text-slate-500 font-sans tracking-normal">Items</span></h3>
-            <p class="text-[8px] text-[#ff6b00] font-mono uppercase mt-2">Requires Immediate Action</p>
+            <h3 class="text-2xl font-black text-white font-display"><?= $metric_expiring_count ?> <span class="text-sm text-slate-500 font-sans tracking-normal">Items</span></h3>
+            <p class="text-[8px] text-[#ff6b00] font-mono uppercase mt-2">Overdue or Expiring within 3 Days</p>
         </div>
     </div>
 
     <div class="bg-[#0f1115] border border-white/5 p-2 flex flex-col md:flex-row gap-2 mb-4">
         <div class="flex-1 flex items-center bg-[#0a0b0d] border border-white/5 px-3 focus-within:border-[#ff6b00]/50 transition-colors">
             <span class="material-symbols-outlined text-slate-600 text-sm">search</span>
-            <input type="text" placeholder="Search Ticket Hash, Name, or Item..." class="w-full bg-transparent border-none text-white text-[11px] font-mono p-2.5 outline-none placeholder:text-slate-600 uppercase">
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search Ticket Hash, Name, or Item..." class="w-full bg-transparent border-none text-white text-[11px] font-mono p-2.5 outline-none placeholder:text-slate-600 uppercase">
         </div>
-        <select class="bg-[#0a0b0d] border border-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest p-2.5 outline-none focus:border-[#ff6b00]/50 cursor-pointer">
-            <option value="all">Type: All</option>
-            <option value="loan">Type: New Loan</option>
-            <option value="renewal">Type: Renewal</option>
+        <select id="statusFilter" onchange="filterTable()" class="bg-[#0a0b0d] border border-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest p-2.5 outline-none focus:border-[#ff6b00]/50 cursor-pointer">
+            <option value="all">Status: All</option>
+            <option value="NEW_LOAN">Status: Active</option>
+            <option value="REDEMPTION">Status: Redeemed</option>
+            <option value="EXPIRED">Status: Expired/Overdue</option>
         </select>
         <button class="bg-white/5 hover:bg-white/10 text-white px-4 flex items-center justify-center border border-white/5 transition-colors">
             <span class="material-symbols-outlined text-sm">filter_list</span>
@@ -123,7 +137,7 @@ include '../../includes/header.php';
     </div>
 
     <div class="bg-[#141518] border border-white/5 overflow-x-auto">
-        <table class="w-full text-left whitespace-nowrap">
+        <table class="w-full text-left whitespace-nowrap" id="loansTable">
             <thead>
                 <tr class="bg-[#0f1115] border-b border-white/5">
                     <th class="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Ticket_Hash</th>
@@ -145,7 +159,6 @@ include '../../includes/header.php';
                     </tr>
                 <?php else: ?>
                     <?php foreach ($transactions as $txn): 
-                        // Logic to format display data
                         $ticket_hash = "PT-" . str_pad($txn['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
                         $customer_name = htmlspecialchars(($txn['first_name'] ?? 'Unknown') . ' ' . ($txn['last_name'] ?? ''));
                         $item_name = htmlspecialchars($txn['item_name'] ?? 'Vault Item');
@@ -153,10 +166,12 @@ include '../../includes/header.php';
                         $due_date = date('M d, Y', strtotime($txn['due_date']));
                         $amount = number_format($txn['principal_amount'], 2);
                         
-                        // Time/Status Logic
                         $is_overdue = (strtotime($txn['due_date']) < time()) && ($txn['status'] === 'active');
                         
-                        // Status styling variations based on your original frontend
+                        $type_class = "text-purple-400";
+                        $type_text = "New_Loan";
+                        $dot_color = "bg-[#00ff41] shadow-[0_0_5px_#00ff41]";
+
                         if ($txn['status'] === 'redeemed' || $txn['status'] === 'redemption') {
                             $type_class = "text-slate-400";
                             $type_text = "Redemption";
@@ -165,10 +180,6 @@ include '../../includes/header.php';
                             $type_class = "text-error-red";
                             $type_text = "Expired";
                             $dot_color = "bg-error-red shadow-[0_0_5px_#ff3b3b]";
-                        } else {
-                            $type_class = "text-purple-400";
-                            $type_text = "New_Loan";
-                            $dot_color = "bg-[#00ff41] shadow-[0_0_5px_#00ff41]";
                         }
                     ?>
                     
@@ -196,7 +207,17 @@ include '../../includes/header.php';
                             <span class="inline-block w-2 h-2 rounded-full <?= $dot_color ?>"></span>
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <button class="text-slate-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-sm">more_vert</span></button>
+                            <div class="flex items-center justify-end gap-2">
+                                <a href="view_ticket.php?id=<?= $txn['pawn_ticket_no'] ?>" class="text-[#00ff41] hover:text-white bg-[#00ff41]/5 hover:bg-[#00ff41]/20 border border-[#00ff41]/20 p-1.5 rounded transition-colors group-hover:opacity-100" title="View Ticket Details">
+                                    <span class="material-symbols-outlined text-[14px]">visibility</span>
+                                </a>
+                                <button onclick="openPrintWindow('<?= $txn['pawn_ticket_no'] ?>')" class="text-blue-400 hover:text-white bg-blue-500/5 hover:bg-blue-500/20 border border-blue-500/20 p-1.5 rounded transition-colors group-hover:opacity-100" title="Print Ticket">
+                                    <span class="material-symbols-outlined text-[14px]">print</span>
+                                </button>
+                                <button class="text-slate-500 hover:text-white transition-colors p-1.5">
+                                    <span class="material-symbols-outlined text-[14px]">more_vert</span>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     
@@ -207,10 +228,74 @@ include '../../includes/header.php';
         </table>
         
         <div class="bg-[#0f1115] border-t border-white/5 px-4 py-3 flex justify-between items-center">
-            <span class="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Showing <?= count($transactions) ?> records</span>
+            <span class="text-[9px] font-mono text-slate-500 uppercase tracking-widest" id="recordCount">Showing <?= count($transactions) ?> records</span>
         </div>
     </div>
 
 </div>
+
+<script>
+// Print popup logic
+function openPrintWindow(ticketNo) {
+    const width = 900;
+    const height = 600;
+    const left = (screen.width - width) / 2;
+    const top = (screen.height - height) / 2;
+    // We point this to view_ticket.php with an extra parameter that triggers the print dialog automatically
+    const printWindow = window.open(`view_ticket.php?id=${ticketNo}&autoprint=true`, 'PrintTicket', `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes`);
+    if (printWindow) printWindow.focus();
+}
+
+// Live filter logic
+function filterTable() {
+    const input = document.getElementById("searchInput").value.toUpperCase();
+    const statusFilter = document.getElementById("statusFilter").value.toUpperCase();
+    const table = document.getElementById("loansTable");
+    const tr = table.getElementsByTagName("tr");
+    let visibleCount = 0;
+
+    // Start loop at 1 to skip the table header
+    for (let i = 1; i < tr.length; i++) {
+        // Skip the "No ledger data" row if it exists
+        if (tr[i].cells.length < 7) continue;
+
+        let textFound = false;
+        let statusFound = false;
+        
+        // Grab the columns we want to check
+        const tdTicket = tr[i].getElementsByTagName("td")[0];
+        const tdCustomerItem = tr[i].getElementsByTagName("td")[1];
+        const tdType = tr[i].getElementsByTagName("td")[3]; // New_Loan, Redemption, Expired
+
+        // Check text search
+        if (tdTicket && tdCustomerItem) {
+            const txtValue = tdTicket.textContent + tdCustomerItem.textContent;
+            if (txtValue.toUpperCase().indexOf(input) > -1) {
+                textFound = true;
+            }
+        }
+
+        // Check dropdown status
+        if (statusFilter === "ALL" || statusFilter === "") {
+            statusFound = true;
+        } else if (tdType) {
+            if (tdType.textContent.toUpperCase().indexOf(statusFilter) > -1) {
+                statusFound = true;
+            }
+        }
+        
+        // Apply visibility
+        if (textFound && statusFound) {
+            tr[i].style.display = "";
+            visibleCount++;
+        } else {
+            tr[i].style.display = "none";
+        }
+    }
+
+    // Update the record count at the bottom
+    document.getElementById('recordCount').innerText = `SHOWING ${visibleCount} RECORDS`;
+}
+</script>
 
 <?php include '../../includes/footer.php'; ?>
