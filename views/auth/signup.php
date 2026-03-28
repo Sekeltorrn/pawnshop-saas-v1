@@ -104,53 +104,62 @@
                 <p class="text-[10px] text-gray-500 font-mono tracking-[0.2em] uppercase">Enter local credentials to begin node sync</p>
             </div>
 
-            <form action="otp.php" method="GET" class="space-y-4">
+            <div class="h-[40px]">
+                <?php if (isset($_GET['error'])): ?>
+                    <div class="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-2 rounded-sm text-xs font-mono tracking-wide flex items-center gap-2 animate-pulse h-full">
+                        <span class="material-symbols-outlined text-sm">warning</span>
+                        <?php echo htmlspecialchars($_GET['error']); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <form action="../../src/Auth/register.php" method="POST" class="space-y-4">
                 
                 <div class="grid grid-cols-3 gap-3">
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">First Name</label>
-                        <input type="text" placeholder="JUAN" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="first_name" required type="text" placeholder="JUAN" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Middle Name</label>
-                        <input type="text" placeholder="SANTOS" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="middle_name" type="text" placeholder="SANTOS" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Last Name</label>
-                        <input type="text" placeholder="DELA CRUZ" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="last_name" required type="text" placeholder="DELA CRUZ" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Work Email</label>
-                        <input type="email" placeholder="ADMIN@PAWNSHOP.PH" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="email" required type="email" placeholder="ADMIN@PAWNSHOP.PH" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Mobile Link</label>
-                        <input type="tel" placeholder="+63 9XXXXXXXXX" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="phone" type="tel" placeholder="+63 9XXXXXXXXX" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Encryption Key</label>
-                        <input type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="password" required minlength="6" type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Confirm Key</label>
-                        <input type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="confirm_password" required minlength="6" type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                 </div>
 
                 <div class="pt-4">
-                    <button type="submit" class="w-full bg-brand_orange text-black font-headline font-black uppercase tracking-[0.3em] py-4 text-xs transition-all hover:brightness-110 glow-orange flex items-center justify-center gap-2">
+                    <button id="submit-btn" type="submit" onclick="this.innerHTML='INITIATING...'; this.style.pointerEvents='none'; this.form.submit();" class="w-full bg-brand_orange text-black font-headline font-black uppercase tracking-[0.3em] py-4 text-xs transition-all hover:brightness-110 glow-orange flex items-center justify-center gap-2">
                         Verify Email <span class="material-symbols-outlined font-bold text-sm">arrow_forward</span>
                     </button>
                 </div>
 
                 <div class="text-center pt-2">
-                    <p class="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Already synced? <a href="#" class="text-brand_orange hover:underline">Login</a></p>
+                    <p class="text-[10px] font-mono text-gray-500 uppercase tracking-widest">Already synced? <a href="login.php" class="text-brand_orange hover:underline">Login</a></p>
                 </div>
             </form>
         </div>

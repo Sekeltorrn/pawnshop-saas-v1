@@ -28,12 +28,38 @@ try {
     $displayShopName = $shopData['shop_name'] ?? 'My Pawnshop';
     $_SESSION['tenant_id'] = $shopData['id'];
 
+    // For the demo, we are using the schema we built earlier. 
+    // In the future, make this dynamic: $tenant_schema = 'tenant_' . $shopData['shop_slug'];
+    $tenant_schema = 'tenant_pwn_18e601'; 
+
+    // --- NEW: FETCH THE ACTUAL LEDGER DATA ---
+    // We join Loans, Inventory, and Customers together
+    $ledgerQuery = "
+        SELECT 
+            l.pawn_ticket_no, 
+            l.principal_amount, 
+            l.loan_date, 
+            l.due_date, 
+            l.status,
+            i.item_name,
+            c.first_name, 
+            c.last_name
+        FROM {$tenant_schema}.loans l
+        LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id
+        LEFT JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id
+        ORDER BY l.created_at DESC
+        LIMIT 50
+    ";
+    
+    $ledgerStmt = $pdo->prepare($ledgerQuery);
+    $ledgerStmt->execute();
+    $transactions = $ledgerStmt->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
 }
 
 $pageTitle = 'Transaction Ledger';
-// Note: Ensure your header.php includes the Tailwind script/config with the Inter/Space Grotesk fonts if it doesn't already!
 include '../../includes/header.php';
 ?>
 
@@ -52,10 +78,10 @@ include '../../includes/header.php';
                 Real-time financial telemetry // Node: <?= htmlspecialchars(substr($current_user_id, 0, 8)) ?>
             </p>
         </div>
-        <button class="bg-[#ff6b00] text-black font-black text-[10px] uppercase tracking-[0.2em] px-6 py-3 shadow-[0_0_20px_rgba(255,107,0,0.3)] hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">
+        <a href="create_ticket.php" class="bg-[#ff6b00] text-black font-black text-[10px] uppercase tracking-[0.2em] px-6 py-3 shadow-[0_0_20px_rgba(255,107,0,0.3)] hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">
             <span class="material-symbols-outlined text-sm">add_circle</span>
             New_Ticket
-        </button>
+        </a>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -86,20 +112,11 @@ include '../../includes/header.php';
             <span class="material-symbols-outlined text-slate-600 text-sm">search</span>
             <input type="text" placeholder="Search Ticket Hash, Name, or Item..." class="w-full bg-transparent border-none text-white text-[11px] font-mono p-2.5 outline-none placeholder:text-slate-600 uppercase">
         </div>
-        
         <select class="bg-[#0a0b0d] border border-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest p-2.5 outline-none focus:border-[#ff6b00]/50 cursor-pointer">
             <option value="all">Type: All</option>
             <option value="loan">Type: New Loan</option>
             <option value="renewal">Type: Renewal</option>
-            <option value="redemption">Type: Redemption</option>
         </select>
-
-        <select class="bg-[#0a0b0d] border border-white/5 text-slate-400 text-[10px] font-black uppercase tracking-widest p-2.5 outline-none focus:border-[#ff6b00]/50 cursor-pointer">
-            <option value="all">Status: Any</option>
-            <option value="active">Status: Active</option>
-            <option value="expired">Status: Expired</option>
-        </select>
-
         <button class="bg-white/5 hover:bg-white/10 text-white px-4 flex items-center justify-center border border-white/5 transition-colors">
             <span class="material-symbols-outlined text-sm">filter_list</span>
         </button>
@@ -120,125 +137,80 @@ include '../../includes/header.php';
             </thead>
             <tbody class="divide-y divide-white/5 text-white">
                 
-                <tr class="hover:bg-white/[0.02] transition-colors group">
-                    <td class="px-4 py-3">
-                        <span class="text-[10px] font-mono text-[#ff6b00] bg-[#ff6b00]/10 px-1.5 py-0.5 border border-[#ff6b00]/20">PT-99201</span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[11px] font-bold uppercase">Dela Cruz, Juan</p>
-                        <p class="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-[150px]">18K Gold Necklace 15g</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[10px] font-mono text-slate-300">Oct 24, 2023</p>
-                        <p class="text-[8px] font-mono text-slate-600 mt-0.5">30 Days (Nov 24)</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="text-[9px] font-black uppercase text-purple-400 tracking-widest">New_Loan</span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <p class="text-xs font-black font-mono">₱14,500.00</p>
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                        <span class="inline-block w-2 h-2 rounded-full bg-[#00ff41] shadow-[0_0_5px_#00ff41]"></span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <button class="text-slate-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-sm">more_vert</span></button>
-                    </td>
-                </tr>
-
-                <tr class="hover:bg-white/[0.02] transition-colors group">
-                    <td class="px-4 py-3">
-                        <span class="text-[10px] font-mono text-slate-400 bg-white/5 px-1.5 py-0.5 border border-white/10">PT-98104</span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[11px] font-bold uppercase">Santos, Maria</p>
-                        <p class="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-[150px]">iPhone 14 Pro Max 256GB</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[10px] font-mono text-slate-300">Oct 24, 2023</p>
-                        <p class="text-[8px] font-mono text-slate-600 mt-0.5">Extended to Dec 24</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="text-[9px] font-black uppercase text-[#00ff41] tracking-widest">Renewal</span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <p class="text-xs font-black font-mono text-[#00ff41]">+₱1,100.00</p>
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                        <span class="inline-block w-2 h-2 rounded-full bg-[#00ff41] shadow-[0_0_5px_#00ff41]"></span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <button class="text-slate-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-sm">more_vert</span></button>
-                    </td>
-                </tr>
-
-                <tr class="hover:bg-white/[0.02] transition-colors group opacity-60 hover:opacity-100">
-                    <td class="px-4 py-3">
-                        <span class="text-[10px] font-mono text-slate-400 bg-white/5 px-1.5 py-0.5 border border-white/10">PT-97055</span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[11px] font-bold uppercase">Reyes, Carlo</p>
-                        <p class="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-[150px]">MacBook Air M1 2020</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[10px] font-mono text-error-red">Sep 15, 2023</p>
-                        <p class="text-[8px] font-mono text-error-red mt-0.5">Expired (Oct 15)</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="text-[9px] font-black uppercase text-error-red tracking-widest">Rematado</span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <p class="text-xs font-black font-mono text-slate-500">₱18,000.00</p>
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                        <span class="inline-block w-2 h-2 rounded-full bg-error-red shadow-[0_0_5px_#ff3b3b]"></span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <button class="text-slate-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-sm">more_vert</span></button>
-                    </td>
-                </tr>
-
-                 <tr class="hover:bg-white/[0.02] transition-colors group">
-                    <td class="px-4 py-3">
-                        <span class="text-[10px] font-mono text-slate-400 bg-white/5 px-1.5 py-0.5 border border-white/10">PT-98990</span>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[11px] font-bold uppercase">Gomez, Anna</p>
-                        <p class="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-[150px]">Casio G-Shock Watch</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <p class="text-[10px] font-mono text-slate-300">Oct 24, 2023</p>
-                        <p class="text-[8px] font-mono text-slate-600 mt-0.5">Closed</p>
-                    </td>
-                    <td class="px-4 py-3">
-                        <span class="text-[9px] font-black uppercase text-slate-400 tracking-widest">Redemption</span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <p class="text-xs font-black font-mono text-[#00ff41]">+₱3,150.00</p>
-                    </td>
-                    <td class="px-4 py-3 text-center">
-                        <span class="inline-block w-2 h-2 rounded-full bg-slate-600"></span>
-                    </td>
-                    <td class="px-4 py-3 text-right">
-                        <button class="text-slate-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-sm">more_vert</span></button>
-                    </td>
-                </tr>
+                <?php if (empty($transactions)): ?>
+                    <tr>
+                        <td colspan="7" class="p-12 text-center text-slate-500 uppercase tracking-widest text-[10px] font-mono">
+                            No ledger data detected. Create a ticket to sync the vault.
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($transactions as $txn): 
+                        // Logic to format display data
+                        $ticket_hash = "PT-" . str_pad($txn['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
+                        $customer_name = htmlspecialchars(($txn['first_name'] ?? 'Unknown') . ' ' . ($txn['last_name'] ?? ''));
+                        $item_name = htmlspecialchars($txn['item_name'] ?? 'Vault Item');
+                        $loan_date = date('M d, Y', strtotime($txn['loan_date']));
+                        $due_date = date('M d, Y', strtotime($txn['due_date']));
+                        $amount = number_format($txn['principal_amount'], 2);
+                        
+                        // Time/Status Logic
+                        $is_overdue = (strtotime($txn['due_date']) < time()) && ($txn['status'] === 'active');
+                        
+                        // Status styling variations based on your original frontend
+                        if ($txn['status'] === 'redeemed' || $txn['status'] === 'redemption') {
+                            $type_class = "text-slate-400";
+                            $type_text = "Redemption";
+                            $dot_color = "bg-slate-600 shadow-none";
+                        } elseif ($is_overdue || $txn['status'] === 'expired') {
+                            $type_class = "text-error-red";
+                            $type_text = "Expired";
+                            $dot_color = "bg-error-red shadow-[0_0_5px_#ff3b3b]";
+                        } else {
+                            $type_class = "text-purple-400";
+                            $type_text = "New_Loan";
+                            $dot_color = "bg-[#00ff41] shadow-[0_0_5px_#00ff41]";
+                        }
+                    ?>
+                    
+                    <tr class="hover:bg-white/[0.02] transition-colors group <?= $is_overdue ? 'opacity-80' : '' ?>">
+                        <td class="px-4 py-3">
+                            <span class="text-[10px] font-mono <?= $is_overdue ? 'text-slate-400 bg-white/5 border-white/10' : 'text-[#ff6b00] bg-[#ff6b00]/10 border-[#ff6b00]/20' ?> px-1.5 py-0.5 border">
+                                <?= $ticket_hash ?>
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <p class="text-[11px] font-bold uppercase"><?= $customer_name ?></p>
+                            <p class="text-[9px] text-slate-500 font-mono mt-0.5 truncate max-w-[150px]"><?= $item_name ?></p>
+                        </td>
+                        <td class="px-4 py-3">
+                            <p class="text-[10px] font-mono <?= $is_overdue ? 'text-error-red' : 'text-slate-300' ?>"><?= $loan_date ?></p>
+                            <p class="text-[8px] font-mono <?= $is_overdue ? 'text-error-red' : 'text-slate-600' ?> mt-0.5">Due: <?= $due_date ?></p>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="text-[9px] font-black uppercase <?= $type_class ?> tracking-widest"><?= $type_text ?></span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <p class="text-xs font-black font-mono <?= $txn['status'] === 'redeemed' ? 'text-[#00ff41]' : '' ?>">₱<?= $amount ?></p>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="inline-block w-2 h-2 rounded-full <?= $dot_color ?>"></span>
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button class="text-slate-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-sm">more_vert</span></button>
+                        </td>
+                    </tr>
+                    
+                    <?php endforeach; ?>
+                <?php endif; ?>
 
             </tbody>
         </table>
         
         <div class="bg-[#0f1115] border-t border-white/5 px-4 py-3 flex justify-between items-center">
-            <span class="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Showing 1-4 of 1,240 records</span>
-            <div class="flex gap-1">
-                <button class="p-1 border border-white/5 text-slate-500 hover:bg-white/5 transition-colors"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
-                <button class="p-1 border border-white/5 text-slate-500 hover:bg-white/5 transition-colors"><span class="material-symbols-outlined text-sm">chevron_right</span></button>
-            </div>
+            <span class="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Showing <?= count($transactions) ?> records</span>
         </div>
     </div>
 
 </div>
 
-<?php 
-// Ensure footer.php exists in your includes folder to close the body/html tags
-include '../../includes/footer.php'; 
-?>
+<?php include '../../includes/footer.php'; ?>

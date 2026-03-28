@@ -1,3 +1,11 @@
+<?php 
+session_start(); 
+// Security Check: Ensure they actually verified their identity first
+if (!isset($_SESSION['user_id'])) {
+    header("Location: signup.php");
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -82,23 +90,32 @@
                 <p class="text-[10px] text-gray-500 font-mono tracking-[0.2em] uppercase">Set up your store identity and access link</p>
             </div>
 
-            <form action="paywall_view.php" method="GET" class="space-y-5">
+            <div class="h-[40px] flex justify-start">
+                <?php if (isset($_GET['error'])): ?>
+                    <div class="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-2 rounded-sm text-xs font-mono tracking-wide flex items-center gap-2 animate-pulse h-full">
+                        <span class="material-symbols-outlined text-sm">warning</span>
+                        <?php echo htmlspecialchars($_GET['error']); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <form action="../../src/Auth/setup_business.php" method="POST" class="space-y-5">
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Business Legal Name</label>
-                        <input type="text" placeholder="DELA CRUZ HOLDINGS INC." class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="business_name" required type="text" placeholder="DELA CRUZ HOLDINGS INC." class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Store Trade Name</label>
-                        <input type="text" placeholder="DELA CRUZ PAWNSHOP" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="trade_name" required type="text" placeholder="DELA CRUZ PAWNSHOP" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Entity Type</label>
-                        <select class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none appearance-none cursor-pointer">
+                        <select name="entity_type" required class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none appearance-none cursor-pointer">
                             <option value="">SELECT_TYPE</option>
                             <option value="sole">SOLE PROPRIETORSHIP</option>
                             <option value="corp">CORPORATION</option>
@@ -107,7 +124,7 @@
                     </div>
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Store Location (City)</label>
-                        <input type="text" placeholder="QUEZON CITY, METRO MANILA" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <input name="location" required type="text" placeholder="QUEZON CITY, METRO MANILA" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
                     </div>
                 </div>
 
@@ -115,13 +132,13 @@
                     <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Dedicated Node URL Slug</label>
                     <div class="relative">
                         <span class="absolute right-4 top-1/2 -translate-y-1/2 font-mono text-[10px] text-gray-600 uppercase tracking-widest">.pawnereno.com</span>
-                        <input type="text" placeholder="MY-PAWNSHOP-NAME" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-brand_orange text-xs font-mono py-3 px-4 outline-none transition-all uppercase tracking-widest">
+                        <input id="slug-input" name="shop_slug" required type="text" placeholder="MY-PAWNSHOP-NAME" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-brand_orange text-xs font-mono py-3 px-4 outline-none transition-all uppercase tracking-widest">
                     </div>
                     <p class="text-[8px] text-gray-600 font-mono uppercase tracking-widest italic pt-1">This will be your primary access point for staff and administrators.</p>
                 </div>
 
                 <div class="pt-6">
-                    <button type="submit" class="w-full bg-brand_orange text-black font-headline font-black uppercase tracking-[0.3em] py-4 text-xs transition-all hover:brightness-110 glow-orange flex items-center justify-center gap-2 active:scale-[0.98]">
+                    <button type="submit" onclick="this.innerHTML='PROVISIONING...'; this.style.pointerEvents='none'; this.form.submit();" class="w-full bg-brand_orange text-black font-headline font-black uppercase tracking-[0.3em] py-4 text-xs transition-all hover:brightness-110 glow-orange flex items-center justify-center gap-2 active:scale-[0.98]">
                         Provision Node & Pay <span class="material-symbols-outlined font-bold text-sm">payments</span>
                     </button>
                 </div>
@@ -135,5 +152,21 @@
         </div>
     </div>
 
+    <script>
+        const slugInput = document.getElementById('slug-input');
+        
+        slugInput.addEventListener('input', function(e) {
+            // Replace spaces with hyphens, remove non-alphanumeric (except hyphens)
+            let formatted = this.value
+                .toUpperCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^A-Z0-9-]/g, '');
+            
+            // Prevent multiple hyphens in a row
+            formatted = formatted.replace(/-+/g, '-');
+            
+            this.value = formatted;
+        });
+    </script>
 </body>
 </html>

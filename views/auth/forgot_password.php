@@ -1,16 +1,10 @@
-<?php 
-session_start(); 
-
-// Check if a "Remember Me" cookie exists
-$savedEmail = isset($_COOKIE['pawnereno_email']) ? $_COOKIE['pawnereno_email'] : '';
-$isRemembered = $savedEmail ? 'checked' : '';
-?>
+<?php session_start(); ?>
 <!DOCTYPE html>
 <html class="dark" lang="en">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>PawnPro | System Login</title>
+    <title>PawnPro | System Recovery</title>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -83,7 +77,7 @@ $isRemembered = $savedEmail ? 'checked' : '';
 <body class="bg-background-dark font-display text-white selection:bg-primary selection:text-white flex flex-col hex-grid relative h-screen">
     <div class="fixed inset-0 scanline-overlay z-50 opacity-20 pointer-events-none"></div>
     <div class="absolute bottom-0 right-0 w-[600px] h-[600px] bg-eva-purple/20 rounded-full blur-[150px] pointer-events-none z-0"></div>
-    <div class="absolute top-0 left-0 w-[400px] h-[400px] bg-neon-green/5 rounded-full blur-[100px] pointer-events-none z-0"></div>
+    <div class="absolute top-0 left-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] pointer-events-none z-0"></div>
     
     <header class="w-full border-b border-white/10 bg-background-dark/80 backdrop-blur-md relative z-40 px-6 py-4 flex items-center justify-between shrink-0 h-[73px]">
         <div class="flex items-center gap-3">
@@ -94,8 +88,8 @@ $isRemembered = $savedEmail ? 'checked' : '';
                 </span>
             </a>
         </div>
-        <div class="border border-neon-green bg-background-dark px-3 py-1 flex items-center shadow-[0_0_10px_rgba(0,255,65,0.2)]">
-            <span class="text-[10px] font-mono text-neon-green font-bold tracking-widest">SYS_READY</span>
+        <div class="border border-primary bg-background-dark px-3 py-1 flex items-center shadow-[0_0_10px_rgba(255,106,0,0.2)]">
+            <span class="text-[10px] font-mono text-primary font-bold tracking-widest">AWAITING_RECOVERY</span>
         </div>
     </header>
 
@@ -108,46 +102,37 @@ $isRemembered = $savedEmail ? 'checked' : '';
                 <div class="corner-bracket corner-bl"></div>
                 <div class="corner-bracket corner-br"></div>
                 <div class="flex justify-center mb-6">
-                    <div class="bg-deep-obsidian border border-white/10 px-4 py-1 flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-neon-green animate-pulse"></div>
-                        <span class="text-[10px] font-mono text-neon-green tracking-widest uppercase">Secure_Protocol_Initiated</span>
+                    <div class="bg-deep-obsidian border border-primary/30 px-4 py-1 flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                        <span class="text-[10px] font-mono text-primary tracking-widest uppercase">Recovery_Protocol_Initiated</span>
                     </div>
                 </div>
                 <div class="text-center mb-8 relative z-10">
                     <h1 class="text-4xl lg:text-5xl font-black italic leading-[0.9] text-white">
-                        THE NEXT GEN<br/>
-                        <span class="text-neon-green relative inline-block">
-                            PAWNSHOP OS
-                            <span class="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-transparent via-neon-green to-transparent opacity-50"></span>
+                        CREDENTIAL<br/>
+                        <span class="text-primary relative inline-block">
+                            OVERRIDE
+                            <span class="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></span>
                         </span>
                     </h1>
                 </div>
                 <div class="space-y-6 relative z-10">
                     <div class="flex items-center gap-4 group">
-                        <div class="w-12 h-12 flex items-center justify-center border border-white/10 rounded bg-white/5 group-hover:border-neon-green/50 transition-colors">
-                            <span class="material-symbols-outlined text-neon-green">lock</span>
+                        <div class="w-12 h-12 flex items-center justify-center border border-white/10 rounded bg-white/5 group-hover:border-primary/50 transition-colors">
+                            <span class="material-symbols-outlined text-primary">key</span>
                         </div>
                         <div>
-                            <div class="text-[10px] text-neon-green/70 font-mono uppercase tracking-wider mb-0.5">System Status</div>
-                            <div class="text-sm font-bold text-white tracking-wide">MILITARY-GRADE ENCRYPTION</div>
+                            <div class="text-[10px] text-primary/70 font-mono uppercase tracking-wider mb-0.5">Authentication</div>
+                            <div class="text-sm font-bold text-white tracking-wide">SECURE KEY RESET</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-4 group">
-                        <div class="w-12 h-12 flex items-center justify-center border border-white/10 rounded bg-white/5 group-hover:border-neon-green/50 transition-colors">
-                            <span class="material-symbols-outlined text-neon-green">description</span>
+                        <div class="w-12 h-12 flex items-center justify-center border border-white/10 rounded bg-white/5 group-hover:border-primary/50 transition-colors">
+                            <span class="material-symbols-outlined text-primary">mark_email_read</span>
                         </div>
                         <div>
-                            <div class="text-[10px] text-neon-green/70 font-mono uppercase tracking-wider mb-0.5">Registry Sync</div>
-                            <div class="text-sm font-bold text-white tracking-wide">SYSTEM REGISTRY ACTIVE</div>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4 group">
-                        <div class="w-12 h-12 flex items-center justify-center border border-white/10 rounded bg-white/5 group-hover:border-neon-green/50 transition-colors">
-                            <span class="material-symbols-outlined text-neon-green">hub</span>
-                        </div>
-                        <div>
-                            <div class="text-[10px] text-neon-green/70 font-mono uppercase tracking-wider mb-0.5">Connectivity</div>
-                            <div class="text-sm font-bold text-white tracking-wide">GLOBAL REACH NODE</div>
+                            <div class="text-[10px] text-primary/70 font-mono uppercase tracking-wider mb-0.5">Verification</div>
+                            <div class="text-sm font-bold text-white tracking-wide">ENCRYPTED CODE DISPATCH</div>
                         </div>
                     </div>
                 </div>
@@ -157,17 +142,14 @@ $isRemembered = $savedEmail ? 'checked' : '';
         <div class="lg:w-1/2 w-full bg-deep-obsidian/50 backdrop-blur-sm relative h-full flex flex-col justify-center">
             <div class="w-full max-w-md mx-auto px-6 lg:px-10">
                 <div class="mb-6">
-                    <h2 class="text-3xl font-bold text-white mb-2">SYSTEM LOGIN</h2>
-                    <p class="text-sm font-mono text-gray-500 uppercase tracking-widest">Enter Credentials to Authenticate...</p>
+                    <h2 class="text-3xl font-bold text-white mb-2">SYSTEM RECOVERY</h2>
+                    <p class="text-sm font-mono text-gray-500 uppercase tracking-widest leading-relaxed">Enter your registered email to receive a secure reset transmission.</p>
                 </div>
 
-                <?php if (isset($_GET['success']) || isset($_SESSION['flash_success'])): ?>
+                <?php if (isset($_GET['success'])): ?>
                     <div class="mb-6 bg-neon-green/10 border border-neon-green/50 text-neon-green px-4 py-3 rounded-sm text-xs font-mono tracking-wide flex items-center gap-3">
-                        <span class="material-symbols-outlined text-sm">check_circle</span>
-                        <?php 
-                            echo isset($_SESSION['flash_success']) ? $_SESSION['flash_success'] : "Account verified. Please log in."; 
-                            unset($_SESSION['flash_success']);
-                        ?>
+                        <span class="material-symbols-outlined text-sm">mark_email_read</span>
+                        Transmission sent! Check your inbox for the 6-digit recovery code.
                     </div>
                 <?php elseif (isset($_GET['error'])): ?>
                     <div class="mb-6 bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-sm text-xs font-mono tracking-wide flex items-center gap-3 animate-pulse">
@@ -176,44 +158,24 @@ $isRemembered = $savedEmail ? 'checked' : '';
                     </div>
                 <?php endif; ?>
 
-                <form id="login-form" action="../../src/Auth/login.php" method="POST" class="space-y-6">
+                <form id="recovery-form" action="../../src/Auth/send_recovery_otp.php" method="POST" class="space-y-6">
                     <div class="space-y-6">
                         
                         <div class="space-y-1">
-                            <label class="text-[10px] font-bold text-neon-green tracking-widest uppercase">Company Email</label>
-                            <input name="email" value="<?php echo htmlspecialchars($savedEmail); ?>" required class="block w-full bg-panel-bg border border-white/10 text-white placeholder-gray-600 focus:ring-0 focus:border-neon-green focus:shadow-[0_0_10px_rgba(0,255,65,0.2)] transition-all duration-300 rounded-sm py-3 px-4 text-xs font-mono tracking-wider" placeholder="admin@company.com" type="email"/>
-                        </div>
-
-                        <div class="space-y-1">
-                            <label class="text-[10px] font-bold text-neon-green tracking-widest uppercase">Password</label>
-                            <div class="relative">
-                                <input id="main-password" name="password" required class="block w-full bg-panel-bg border border-white/10 text-white placeholder-gray-600 focus:ring-0 focus:border-neon-green focus:shadow-[0_0_10px_rgba(0,255,65,0.2)] transition-all duration-300 rounded-sm py-3 px-4 pr-10 text-xs font-mono tracking-wider" placeholder="********" type="password"/>
-                                <button type="button" onclick="togglePasswordVisibility('main-password', 'eye-icon-1')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-neon-green transition-colors focus:outline-none">
-                                    <span id="eye-icon-1" class="material-symbols-outlined text-sm">visibility</span>
-                                </button>
-                            </div>
-                            
-                            <div class="flex justify-between items-center mt-3 pt-1">
-                                <label class="flex items-center gap-2 cursor-pointer group">
-                                    <div class="relative flex items-center justify-center w-[14px] h-[14px] border border-white/20 bg-panel-bg rounded-[2px] group-hover:border-neon-green transition-colors">
-                                        <input type="checkbox" name="remember" class="absolute opacity-0 w-full h-full cursor-pointer peer" <?php echo $isRemembered; ?> />
-                                        <span class="material-symbols-outlined text-[12px] text-neon-green opacity-0 peer-checked:opacity-100 transition-opacity absolute">check</span>
-                                    </div>
-                                    <span class="text-[10px] font-mono text-gray-500 group-hover:text-neon-green transition-colors uppercase tracking-widest">Remember Me</span>
-                                </label>
-                                <a class="text-[9px] font-mono text-gray-500 hover:text-primary transition-colors uppercase tracking-tighter" href="forgot_password.php">Forgot Password?</a>
-                            </div>
+                            <label class="text-[10px] font-bold text-primary tracking-widest uppercase">Company Email</label>
+                            <input name="email" required class="block w-full bg-panel-bg border border-white/10 text-white placeholder-gray-600 focus:ring-0 focus:border-primary focus:shadow-[0_0_10px_rgba(255,106,0,0.2)] transition-all duration-300 rounded-sm py-3 px-4 text-xs font-mono tracking-wider" placeholder="admin@company.com" type="email"/>
                         </div>
 
                     </div>
 
                     <div class="pt-6 flex flex-col gap-4">
                         <button id="submit-btn" class="w-full bg-primary text-background-dark py-4 px-8 rounded-sm font-bold text-sm tracking-[0.2em] uppercase glow-primary hover:bg-primary/90 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-3 group" type="submit">
-                            <span id="btn-text">ENTER SYSTEM</span>
-                            <span id="btn-icon" class="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                            <span id="btn-text">DISPATCH CODE</span>
+                            <span id="btn-icon" class="material-symbols-outlined text-lg group-hover:translate-x-1 transition-transform">send</span>
                         </button>
-                        <div class="text-[10px] font-mono text-gray-500 text-center uppercase tracking-widest">
-                            New here? <a class="text-primary hover:text-white transition-colors" href="signup.php">Sign up</a>
+                        <div class="text-[10px] font-mono text-gray-500 text-center uppercase tracking-widest flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined text-[12px]">arrow_back</span>
+                            <a class="text-gray-400 hover:text-white transition-colors" href="login.php">Return to Login</a>
                         </div>
                     </div>
                 </form>
@@ -222,21 +184,8 @@ $isRemembered = $savedEmail ? 'checked' : '';
     </main>
 
     <script>
-        function togglePasswordVisibility(inputId, iconId) {
-            const inputField = document.getElementById(inputId);
-            const icon = document.getElementById(iconId);
-            
-            if (inputField.type === "password") {
-                inputField.type = "text";
-                icon.textContent = "visibility_off";
-            } else {
-                inputField.type = "password";
-                icon.textContent = "visibility";
-            }
-        }
-
         // LOADING STATE HANDLER
-        document.getElementById('login-form').addEventListener('submit', function() {
+        document.getElementById('recovery-form').addEventListener('submit', function() {
             const btn = document.getElementById('submit-btn');
             const text = document.getElementById('btn-text');
             const icon = document.getElementById('btn-icon');
@@ -247,7 +196,7 @@ $isRemembered = $savedEmail ? 'checked' : '';
             btn.classList.remove('glow-primary', 'hover:scale-[1.01]', 'active:scale-[0.99]');
             
             // Update Text and Icon
-            text.textContent = "AUTHENTICATING...";
+            text.textContent = "TRANSMITTING...";
             icon.textContent = "sync";
             icon.classList.remove('group-hover:translate-x-1');
             icon.classList.add('animate-spin');

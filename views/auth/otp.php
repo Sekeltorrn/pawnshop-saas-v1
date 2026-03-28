@@ -1,3 +1,11 @@
+<?php 
+session_start(); 
+// Security Check: If they didn't just register, kick them out
+if (!isset($_SESSION['temp_email'])) {
+    header("Location: signup.php");
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -77,7 +85,7 @@
 
     <div class="w-full md:w-7/12 flex flex-col justify-center items-center p-6 lg:p-12 relative bg-black/40">
         
-        <div class="max-w-xl w-full space-y-10">
+        <div class="max-w-xl w-full space-y-8">
             
             <div class="flex items-center justify-between px-16 relative">
                 <div class="absolute top-1/2 left-16 right-16 h-[1px] bg-outline_gray -translate-y-1/2"></div>
@@ -97,48 +105,84 @@
 
             <div class="text-center">
                 <h2 class="text-4xl font-headline font-bold text-white tracking-tighter uppercase mb-2">Auth_Code_Required</h2>
-                <p class="text-[10px] text-gray-500 font-mono tracking-[0.2em] uppercase">Enter the 6-digit sequence transmitted to your email</p>
+                <p class="text-[10px] text-gray-500 font-mono tracking-[0.2em] uppercase">
+                    Enter the 6-digit sequence transmitted to <br> <span class="text-brand_green"><?php echo htmlspecialchars($_SESSION['temp_email']); ?></span>
+                </p>
             </div>
 
-            <div class="flex flex-col items-center space-y-8">
+            <div class="h-[40px] flex justify-center">
+                <?php if (isset($_GET['error'])): ?>
+                    <div class="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-2 rounded-sm text-xs font-mono tracking-wide flex items-center gap-2 animate-pulse h-full">
+                        <span class="material-symbols-outlined text-sm">warning</span>
+                        <?php echo htmlspecialchars($_GET['error']); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <form id="otp-form" action="../../src/Auth/verify.php" method="POST" class="flex flex-col items-center space-y-8">
+                
+                <input type="hidden" name="token" id="full-token">
+
                 <div class="flex gap-3" id="otp-inputs">
-                    <input type="text" maxlength="1" class="otp-input" autofocus>
-                    <input type="text" maxlength="1" class="otp-input">
-                    <input type="text" maxlength="1" class="otp-input">
-                    <input type="text" maxlength="1" class="otp-input">
-                    <input type="text" maxlength="1" class="otp-input">
-                    <input type="text" maxlength="1" class="otp-input">
+                    <input type="text" maxlength="1" class="otp-input" autofocus autocomplete="off">
+                    <input type="text" maxlength="1" class="otp-input" autocomplete="off">
+                    <input type="text" maxlength="1" class="otp-input" autocomplete="off">
+                    <input type="text" maxlength="1" class="otp-input" autocomplete="off">
+                    <input type="text" maxlength="1" class="otp-input" autocomplete="off">
+                    <input type="text" maxlength="1" class="otp-input" autocomplete="off">
                 </div>
 
                 <div class="w-full max-w-sm space-y-4">
-                    <button onclick="window.location.href='documents.php'" class="w-full bg-brand_orange text-black font-headline font-black uppercase tracking-[0.3em] py-4 text-xs transition-all hover:brightness-110 glow-orange flex items-center justify-center gap-2 active:scale-[0.98]">
+                    <button type="submit" class="w-full bg-brand_orange text-black font-headline font-black uppercase tracking-[0.3em] py-4 text-xs transition-all hover:brightness-110 glow-orange flex items-center justify-center gap-2 active:scale-[0.98]">
                         Verify & Next Step <span class="material-symbols-outlined font-bold text-sm">verified_user</span>
                     </button>
                     
-                    <button class="w-full text-brand_green font-mono text-[9px] uppercase tracking-[0.2em] hover:underline opacity-60">
+                    <button type="button" class="w-full text-brand_green font-mono text-[9px] uppercase tracking-[0.2em] hover:underline opacity-60">
                         Request New Transmission (Resend Code)
                     </button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 
     <script>
-        // Auto-focus next input logic
+        // Auto-focus and combine logic
         const inputs = document.querySelectorAll('.otp-input');
+        const form = document.getElementById('otp-form');
+        const hiddenTokenInput = document.getElementById('full-token');
         
         inputs.forEach((input, index) => {
             input.addEventListener('input', (e) => {
+                // Move to next input if filled
                 if (e.target.value.length === 1 && index < inputs.length - 1) {
                     inputs[index + 1].focus();
                 }
             });
 
             input.addEventListener('keydown', (e) => {
+                // Move back on backspace if empty
                 if (e.key === 'Backspace' && !e.target.value && index > 0) {
                     inputs[index - 1].focus();
                 }
             });
+        });
+
+        // Right before the form submits, mash the 6 boxes together into the hidden input
+        form.addEventListener('submit', (e) => {
+            let token = '';
+            inputs.forEach(input => token += input.value);
+            hiddenTokenInput.value = token;
+            
+            // Basic check before sending to PHP
+            if(token.length !== 6) {
+                e.preventDefault();
+                alert('Please enter all 6 digits.');
+            } else {
+                // Change button state
+                const btn = form.querySelector('button[type="submit"]');
+                btn.innerHTML = 'VERIFYING... <span class="material-symbols-outlined font-bold text-sm animate-spin">sync</span>';
+                btn.style.pointerEvents = 'none';
+            }
         });
     </script>
 </body>

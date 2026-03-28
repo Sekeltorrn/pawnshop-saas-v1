@@ -102,7 +102,7 @@
     </div>
 
     <div class="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8 text-xs font-bold tracking-[0.2em] uppercase text-gray-400">
-        <a class="hover:text-neon-green transition-colors" href="/views/auth/signup.php">Signup/Login</a>
+        <a class="hover:text-neon-green transition-colors" href="/views/auth/login.php">Signup/Login</a>
         <a class="hover:text-neon-green transition-colors" href="contact.php">Contact Us</a>
         <a class="hover:text-neon-green transition-colors" href="discover.php">Discover</a>
     </div>

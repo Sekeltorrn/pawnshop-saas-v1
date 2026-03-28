@@ -160,6 +160,12 @@ function getNavClass($page, $current) {
                 <span class="material-symbols-outlined" data-icon="database">database</span>
                 SYS_BACKUP
             </a>
+
+            <a href="applicants.php" class="<?= getNavClass('applicants.php', $current_page) ?>">
+                <span class="material-symbols-outlined" data-icon="database">database</span>
+                APPLICANTS
+            </a>
+
         </nav>
     </aside>
 

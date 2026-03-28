@@ -2,8 +2,8 @@
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
-// src/Auth/register.php
 
+// src/Auth/register.php
 session_start();
 
 // 1. Load the Supabase Helper
@@ -12,35 +12,41 @@ require_once __DIR__ . '/../../config/supabase.php';
 // 2. Only run if the form was actually submitted
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // A. Grab the raw form data
-    $email = $_POST['email'] ?? '';
+    // A. Grab the raw form data from Step 1 (Identity)
+    $firstName = trim($_POST['first_name'] ?? '');
+    $middleName = trim($_POST['middle_name'] ?? '');
+    $lastName = trim($_POST['last_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirmPassword = $_POST['confirm_password'] ?? '';
-    $fullName = $_POST['full_name'] ?? '';
-    $businessName = $_POST['business_name'] ?? '';
-    $country = $_POST['country'] ?? '';
+
+    // Create the full name for the profiles table
+    $fullName = trim($firstName . ' ' . $middleName . ' ' . $lastName);
+    // Standardize double spaces if middle name is empty
+    $fullName = preg_replace('/\s+/', ' ', $fullName); 
 
     // B. Basic Validation
-    if (empty($email) || empty($password)) {
-        header("Location: /views/auth/signup.php?error=" . urlencode("Email and Password are required"));
+    if (empty($email) || empty($password) || empty($firstName) || empty($lastName)) {
+        header("Location: ../../views/auth/signup.php?error=" . urlencode("All required fields must be filled."));
         exit;
     }
 
     if ($password !== $confirmPassword) {
-        header("Location: /views/auth/signup.php?error=" . urlencode("Passwords do not match"));
+        header("Location: ../../views/auth/signup.php?error=" . urlencode("Passwords do not match."));
         exit;
     }
 
     if (strlen($password) < 6) {
-        header("Location: /views/auth/signup.php?error=" . urlencode("Password must be at least 6 characters"));
+        header("Location: ../../views/auth/signup.php?error=" . urlencode("Encryption key must be at least 6 characters."));
         exit;
     }
 
-    // C. Prepare the "Metadata"
+    // C. Prepare the "Metadata" to feed the SQL Trigger
+    // We omit business_name and country here because they are added in Step 3
     $metaData = [
         'full_name' => $fullName,
-        'business_name' => $businessName,
-        'country' => $country
+        'phone' => $phone
     ];
 
     // D. Send to Supabase
@@ -51,48 +57,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // E. Check the Result
         if ($result['code'] === 200 || $result['code'] === 201) {
             
-            // SAFETY CHECK: Supabase returns a fake 200 OK response if the email already exists
-            // to prevent hackers from guessing emails. We must verify the user object actually exists.
+            // SAFETY CHECK: Ensure user wasn't already registered
             $userId = $result['body']['user']['id'] ?? $result['body']['id'] ?? null;
 
             if (!$userId) {
-                // Supabase returned success, but no user data. The email is likely already taken.
-                header("Location: /views/auth/signup.php?error=" . urlencode("This email is already registered. Please log in."));
+                header("Location: ../../views/auth/signup.php?error=" . urlencode("This email is already registered. Please log in."));
                 exit;
             }
 
-            // Auto-login the user into the PHP Session
-            $_SESSION['user_id'] = $userId;
-            $_SESSION['email'] = $email;
-            $_SESSION['business_name'] = $businessName;
+            // Temporarily store email in session so the OTP page knows who to verify
+            $_SESSION['temp_email'] = $email;
             
-            // We know the SQL trigger automatically sets them to unpaid, 
-            // so we mirror that in the session here:
-            $_SESSION['payment_status'] = 'unpaid'; 
-            
-            // Redirect straight to the Paywall / Limbo Room!
-            header("Location: /views/auth/paywall.php");
+            // Send them to Step 2 (Verify)
+            header("Location: ../../views/auth/otp.php");
             exit;
 
         } else {
             // F. Handle Supabase Errors
-            // Added an extra ['message'] fallback just to be safe with Supabase API formats
             $errorMessage = $result['body']['msg'] 
                          ?? $result['body']['message']
                          ?? $result['body']['error_description'] 
                          ?? 'Registration failed. Please try again.';
             
-            header("Location: /views/auth/signup.php?error=" . urlencode($errorMessage));
+            header("Location: ../../views/auth/signup.php?error=" . urlencode($errorMessage));
             exit;
         }
 
     } catch (Exception $e) {
         // G. Handle System Errors
-        header("Location: /views/auth/signup.php?error=" . urlencode("System Error: " . $e->getMessage()));
+        header("Location: ../../views/auth/signup.php?error=" . urlencode("System Error: " . $e->getMessage()));
         exit;
     }
 } else {
-    header("Location: /views/auth/signup.php");
+    // If someone tries to visit register.php directly without submitting a form
+    header("Location: ../../views/auth/signup.php");
     exit;
 }
 ?>
