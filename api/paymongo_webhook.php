@@ -1,12 +1,12 @@
 <?php
 // api/paymongo_webhook.php
-require_once '../config/db_connect.php';
 
-function logError($message) {
-    $log_file = __DIR__ . '/webhook_error.txt';
-    $time = date('[Y-m-d H:i:s] ');
-    file_put_contents($log_file, $time . $message . "\n", FILE_APPEND);
-}
+// 1. EMERGENCY ERROR REPORTING (Will force Render to show us the error)
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+require_once '../config/db_connect.php';
 
 try {
     $payload = file_get_contents('php://input');
@@ -71,7 +71,6 @@ try {
         $intent = $parts[2] ?? 'RENEW'; 
         $tenant_schema = 'tenant_pwn_18e601'; 
 
-        // Try to fetch the loan
         $stmt = $pdo->prepare("SELECT loan_id FROM {$tenant_schema}.loans WHERE pawn_ticket_number = ?");
         $padded_ticket = str_pad($ticket_num_string, 5, '0', STR_PAD_LEFT);
         
@@ -86,28 +85,30 @@ try {
         if ($loan) {
             $loan_id = $loan['loan_id'];
             
+            // BULLETPROOF OLD-SCHOOL PHP (Replaced PHP 8 match function)
+            $pay_type = 'interest'; // Default
+            if ($intent === 'REDEEM') {
+                $pay_type = 'full_redemption';
+            } elseif ($intent === 'PARTIAL') {
+                $pay_type = 'principal';
+            }
+            
             // Insert Payment
             $pay_stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.payments (loan_id, amount, payment_type, reference_number) VALUES (?, ?, ?, ?)");
-            $pay_type = match($intent) { 'REDEEM' => 'full_redemption', 'PARTIAL' => 'principal', default => 'interest' };
             $pay_stmt->execute([$loan_id, $amount_paid_php, $pay_type, $reference_number]);
 
             // Update Status
             $new_status = ($intent === 'REDEEM') ? 'redeemed' : 'renewed';
             $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
             $upd_stmt->execute([$new_status, $loan_id]);
-            
-            logError("SUCCESS: Processed Payment for $reference_number");
-        } else {
-            logError("CRASH: Could not find pawn ticket number: $ticket_num_string in loans table.");
         }
     }
 
     http_response_code(200);
     echo "Webhook processed successfully.";
 
-} catch (PDOException $e) {
-    logError("DATABASE CRASH: " . $e->getMessage());
+} catch (Exception $e) {
     http_response_code(500);
-    echo "DB Error";
+    echo "Error: " . $e->getMessage();
 }
 ?>
