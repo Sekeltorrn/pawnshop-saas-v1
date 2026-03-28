@@ -78,10 +78,23 @@ try {
 
         $tenant_schema = 'tenant_pwn_18e601'; // Ensure this matches your live schema
 
-        // 1. Fetch the exact loan_id (FIXED LOGIC)
-        $stmt = $pdo->prepare("SELECT loan_id, customer_id FROM {$tenant_schema}.loans WHERE pawn_ticket_no = ? OR pawn_ticket_number = ?");
-        $stmt->execute([$ticket_num_string, $ticket_num_string]);
+        // 1. Fetch the exact loan_id using the correct column name
+        $stmt = $pdo->prepare("SELECT loan_id, customer_id FROM {$tenant_schema}.loans WHERE pawn_ticket_number = ?");
+        
+        // Sometimes PayMongo sends the reference as PT-00123 instead of PT-123. Let's check both!
+        $padded_ticket = str_pad($ticket_num_string, 5, '0', STR_PAD_LEFT);
+        
+        // Check for either the raw number or the 0-padded number
+        $stmt->execute([$ticket_num_string]);
         $loan = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$loan) {
+            $stmt->execute([$padded_ticket]);
+            $loan = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        // Ensure the ticket format is also correct for the update
+        $ticket_to_update = $loan ? $loan['pawn_ticket_number'] : $ticket_num_string;
 
         if ($loan) {
             $loan_id = $loan['loan_id'];
@@ -101,7 +114,7 @@ try {
             // 3. Update the Vault Asset Status
             $new_status = ($intent === 'REDEEM') ? 'redeemed' : 'renewed';
             $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
-            $upd_stmt->execute([$new_status, $loan_id]);
+            $upd_stmt->execute([$new_status, $loan['loan_id']]);
         }
     }
 
