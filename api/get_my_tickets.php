@@ -21,9 +21,14 @@ if (!$customer_id || !$shop_code) {
     exit;
 }
 
-// 🔴 DYNAMIC SCHEMA: Sanitize the shop code (letters/numbers only) to prevent SQL Injection
+// 🟢 NEW SMART PREFIX CHECK
 $sanitized_code = preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code);
-$tenant_schema = 'tenant_pwn_' . strtolower($sanitized_code); 
+// If the phone already sent the 'tenant_pwn_' part, just use it. If not, add it!
+if (strpos($sanitized_code, 'tenant_pwn_') === 0) {
+    $tenant_schema = strtolower($sanitized_code);
+} else {
+    $tenant_schema = 'tenant_pwn_' . strtolower($sanitized_code);
+}
 
 try {
     $stmt = $pdo->prepare("
