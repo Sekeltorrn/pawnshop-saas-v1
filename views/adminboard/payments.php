@@ -11,19 +11,47 @@ require_once '../../config/db_connect.php';
 $current_user_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? 'DEMO_NODE_01';
 $tenant_schema = 'tenant_pwn_18e601';
 
-// 2. SYSTEM SETTINGS (Defaults)
+// 2. SYSTEM SETTINGS
 $RATE_MONTH_1   = 3.5;
 $RATE_RENEWAL   = 5.0;
 $SERVICE_CHARGE = 5.00;
 
-// 3. DYNAMIC INTEREST CALCULATOR
+// -------------------------------------------------------------------------
+// 3. PROCESS LOCAL CASH TRANSACTION (WALK-INS)
+// -------------------------------------------------------------------------
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'walk_in_payment') {
+    $loan_id = $_POST['loan_id'];
+    $amount = floatval($_POST['amount']);
+    $type = $_POST['payment_type']; // 'interest', 'principal', or 'full_redemption'
+    $or_number = $_POST['or_number'] ?? 'N/A';
+
+    try {
+        // A. Insert the manual cash payment (leaving reference_number blank)
+        $stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.payments (loan_id, amount, payment_type, or_number) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$loan_id, $amount, $type, $or_number]);
+
+        // B. Update the Vault Asset Status
+        $new_status = ($type === 'full_redemption') ? 'redeemed' : 'renewed';
+        $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
+        $upd_stmt->execute([$new_status, $loan_id]);
+
+        // Redirect to clear the form and show success message
+        header("Location: payments.php?msg=" . urlencode("Cash transaction successful. Asset marked as {$new_status}."));
+        exit();
+    } catch (PDOException $e) {
+        die("Transaction Error: " . $e->getMessage());
+    }
+}
+
+// -------------------------------------------------------------------------
+// 4. DYNAMIC INTEREST CALCULATOR
+// -------------------------------------------------------------------------
 function calculateDynamicInterest($principal, $loan_date, $due_date_override = null) {
     global $RATE_MONTH_1, $RATE_RENEWAL; 
 
     if ($due_date_override) {
         $now = new DateTime();
         $due = new DateTime($due_date_override);
-        
         $diff_days = $due->diff($now)->format("%r%a"); 
         $days_passed = intval($diff_days) + 30; 
         $months = ceil($days_passed / 30);
@@ -51,27 +79,29 @@ function calculateDynamicInterest($principal, $loan_date, $due_date_override = n
     ];
 }
 
-// 4. FETCH REAL DATA FOR SIDEBARS
-$pending_payments = [];
+// -------------------------------------------------------------------------
+// 5. FETCH DATA FOR SIDEBARS
+// -------------------------------------------------------------------------
+// Fetch Automated Online Payments (Read-Only Ledger)
+$recent_online_payments = [];
 try {
-    // Wrap in try/catch in case payments table isn't created yet
     $stmt = $pdo->prepare("
-        SELECT p.*, l.pawn_ticket_no, c.first_name, c.last_name 
+        SELECT p.*, l.pawn_ticket_number, c.first_name, c.last_name 
         FROM {$tenant_schema}.payments p
-        JOIN {$tenant_schema}.loans l ON p.pawn_ticket_no = l.pawn_ticket_no
+        JOIN {$tenant_schema}.loans l ON p.loan_id = l.loan_id
         JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id
-        WHERE p.status = 'pending' ORDER BY p.payment_date ASC
+        WHERE p.reference_number IS NOT NULL 
+        ORDER BY p.payment_date DESC LIMIT 15
     ");
     $stmt->execute();
-    $pending_payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // Payments table might not exist yet, safely ignore for UI rendering
-}
+    $recent_online_payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) { }
 
+// Fetch Active Walk-In Candidates
 $active_loans = [];
 try {
     $stmt = $pdo->prepare("
-        SELECT l.pawn_ticket_no, l.due_date, i.item_name, c.first_name, c.last_name 
+        SELECT l.pawn_ticket_number, l.due_date, i.item_name, c.first_name, c.last_name 
         FROM {$tenant_schema}.loans l 
         LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id 
         LEFT JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
@@ -80,32 +110,14 @@ try {
     ");
     $stmt->execute();
     $active_loans = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    die("Database Error: " . $e->getMessage());
-}
+} catch (PDOException $e) {}
 
-// 5. DETERMINE CURRENT STATE
-$pending_payment_data = null;
+// -------------------------------------------------------------------------
+// 6. FETCH SELECTED TICKET FOR TERMINAL
+// -------------------------------------------------------------------------
 $loan_data = null;
-
-if (isset($_GET['review_id'])) {
-    $pay_id = intval($_GET['review_id']);
-    try {
-        $stmt = $pdo->prepare("
-            SELECT p.*, l.pawn_ticket_no, i.item_name, c.first_name, c.last_name, l.principal_amount, l.loan_date, l.due_date
-            FROM {$tenant_schema}.payments p 
-            JOIN {$tenant_schema}.loans l ON p.pawn_ticket_no = l.pawn_ticket_no 
-            LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id
-            JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
-            WHERE p.payment_id = ?
-        ");
-        $stmt->execute([$pay_id]);
-        $pending_payment_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {}
-} elseif (isset($_GET['select_ticket']) || isset($_GET['search_ticket'])) {
+if (isset($_GET['select_ticket']) || isset($_GET['search_ticket'])) {
     $ticket = $_GET['select_ticket'] ?? $_GET['search_ticket'];
-    
-    // Remove 'PT-' prefix if user typed it
     $ticket_num = str_replace('PT-', '', strtoupper($ticket));
     
     try {
@@ -114,10 +126,18 @@ if (isset($_GET['review_id'])) {
             FROM {$tenant_schema}.loans l 
             LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id
             JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
-            WHERE l.pawn_ticket_no = ?
+            WHERE l.pawn_ticket_number = ?
         ");
+        
+        $padded_ticket = str_pad($ticket_num, 5, '0', STR_PAD_LEFT);
+        
         $stmt->execute([$ticket_num]);
         $loan_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$loan_data) {
+            $stmt->execute([$padded_ticket]);
+            $loan_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
     } catch (PDOException $e) {}
 }
 
@@ -152,29 +172,28 @@ include '../../includes/header.php';
                 
                 <div class="p-4 bg-[#ff6b00]/5 border-b border-[#ff6b00]/20 flex justify-between items-center shrink-0">
                     <h3 class="text-[#ff6b00] font-black text-[10px] uppercase tracking-[0.2em] flex items-center gap-2">
-                        <span class="material-symbols-outlined text-sm">wifi_tethering</span> Online Queue
+                        <span class="material-symbols-outlined text-sm">wifi_tethering</span> Automated Receipts
                     </h3>
-                    <span class="bg-[#ff6b00] text-black text-[10px] font-black px-2 py-0.5 rounded-sm"><?= count($pending_payments) ?></span>
                 </div>
                 
                 <div class="overflow-y-auto custom-scrollbar p-3 flex-1 space-y-2">
-                    <?php if (empty($pending_payments)): ?>
+                    <?php if (empty($recent_online_payments)): ?>
                         <div class="flex flex-col items-center justify-center h-full text-slate-500 opacity-50">
-                            <span class="material-symbols-outlined mb-2">done_all</span>
-                            <p class="text-[9px] uppercase tracking-widest font-black">Queue Empty</p>
+                            <span class="material-symbols-outlined mb-2">history</span>
+                            <p class="text-[9px] uppercase tracking-widest font-black">No Remote Activity</p>
                         </div>
                     <?php else: ?>
-                        <?php foreach ($pending_payments as $p): ?>
-                            <a href="?review_id=<?= $p['payment_id'] ?>" class="block p-3 bg-[#0a0b0d] hover:bg-[#ff6b00]/10 border border-white/5 hover:border-[#ff6b00]/30 transition-all group/item">
+                        <?php foreach ($recent_online_payments as $p): ?>
+                            <div class="block p-3 bg-[#0a0b0d] border border-white/5 opacity-80 cursor-default">
                                 <div class="flex justify-between items-center mb-1">
-                                    <p class="text-white font-bold text-xs uppercase group-hover/item:text-[#ff6b00] transition-colors"><?= htmlspecialchars($p['last_name'] . ', ' . $p['first_name']) ?></p>
-                                    <span class="text-[9px] font-black text-[#00ff41] bg-[#00ff41]/10 px-1.5 py-0.5 uppercase tracking-wider"><?= htmlspecialchars($p['payment_method']) ?></span>
+                                    <p class="text-white font-bold text-xs uppercase"><?= htmlspecialchars($p['last_name'] . ', ' . $p['first_name']) ?></p>
+                                    <span class="text-[9px] font-black text-[#ff6b00] bg-[#ff6b00]/10 border border-[#ff6b00]/20 px-1.5 py-0.5 uppercase tracking-wider">PayMongo</span>
                                 </div>
                                 <div class="flex justify-between mt-2">
-                                    <span class="text-[10px] text-slate-500 font-mono">PT-<?= str_pad($p['pawn_ticket_no'], 5, '0', STR_PAD_LEFT) ?></span>
+                                    <span class="text-[10px] text-slate-500 font-mono">PT-<?= str_pad($p['pawn_ticket_number'], 5, '0', STR_PAD_LEFT) ?></span>
                                     <span class="text-white font-mono font-bold text-xs">₱<?= number_format($p['amount'], 2) ?></span>
                                 </div>
-                            </a>
+                            </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
@@ -203,9 +222,9 @@ include '../../includes/header.php';
                     <?php else: ?>
                         <?php foreach ($active_loans as $l): 
                             $is_overdue = (strtotime($l['due_date']) < time());
-                            $ticket_str = 'PT-' . str_pad($l['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
+                            $ticket_str = 'PT-' . str_pad($l['pawn_ticket_number'], 5, '0', STR_PAD_LEFT);
                         ?>
-                            <a href="?select_ticket=<?= $l['pawn_ticket_no'] ?>" class="block p-3 bg-[#0a0b0d] hover:bg-[#00ff41]/10 hover:border-[#00ff41]/30 transition-all border border-white/5 group/item">
+                            <a href="?select_ticket=<?= $l['pawn_ticket_number'] ?>" class="block p-3 bg-[#0a0b0d] hover:bg-[#00ff41]/10 hover:border-[#00ff41]/30 transition-all border border-white/5 group/item">
                                 <div class="flex justify-between items-center mb-2">
                                     <span class="text-[#00ff41] font-mono text-xs font-bold tracking-tight"><?= $ticket_str ?></span>
                                     <?php if ($is_overdue): ?>
@@ -231,78 +250,7 @@ include '../../includes/header.php';
                 </div>
             <?php endif; ?>
 
-            <?php if ($pending_payment_data): ?>
-                <?php 
-                    $calc = calculateDynamicInterest($pending_payment_data['principal_amount'], $pending_payment_data['loan_date'], $pending_payment_data['due_date']);
-                    $raw_type = $pending_payment_data['payment_type'] ?? '';
-                    $paid_amount = floatval($pending_payment_data['amount']);
-                    $renewal_cost = $calc['interest_amount'] + $SERVICE_CHARGE;
-
-                    if (!empty($raw_type)) {
-                        $transaction_label = match($raw_type) {
-                            'principal' => 'Partial Payment',
-                            'interest'  => 'Renewal / Interest',
-                            'full_redemption', 'redeem' => 'Full Redemption',
-                            'penalty' => 'Penalty Payment',
-                            default => ucwords(str_replace('_', ' ', $raw_type))
-                        };
-                    } else {
-                        if ($paid_amount >= ($pending_payment_data['principal_amount'] + $renewal_cost)) {
-                            $transaction_label = 'Full Redemption (Auto-Detected)';
-                        } elseif ($paid_amount > ($renewal_cost + 100)) { 
-                            $transaction_label = 'Partial Payment (Auto-Detected)';
-                        } else {
-                            $transaction_label = 'Renewal / Interest';
-                        }
-                    }
-                ?>
-                <div class="bg-[#141518] border border-[#ff6b00]/50 p-8 shadow-[0_0_30px_rgba(255,107,0,0.15)] h-full overflow-y-auto relative">
-                    <div class="absolute top-0 right-0 w-1 h-full bg-gradient-to-b from-[#ff6b00] to-transparent"></div>
-
-                    <div class="flex justify-between items-start mb-8 border-b border-white/5 pb-6">
-                        <div>
-                            <p class="text-[10px] font-black text-[#ff6b00] uppercase tracking-[0.2em] mb-1">Remote Transaction Pending</p>
-                            <h2 class="text-3xl font-black text-white font-display uppercase tracking-tight">Verify Payment</h2>
-                        </div>
-                        <a href="payments.php" class="flex items-center gap-2 px-3 py-1.5 border border-white/10 text-[9px] text-slate-400 font-black uppercase tracking-widest hover:bg-white/5 hover:text-white transition-colors">
-                            <span class="material-symbols-outlined text-sm">close</span> Abort
-                        </a>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4 mb-8">
-                        <div class="bg-[#0a0b0d] p-5 border border-white/5 border-l-2 border-l-slate-500">
-                            <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Target Account</p>
-                            <p class="text-lg font-black text-white uppercase"><?= htmlspecialchars($pending_payment_data['last_name'] . ', ' . $pending_payment_data['first_name']) ?></p>
-                            <p class="text-xs font-mono text-[#00ff41] mt-1">PT-<?= str_pad($pending_payment_data['pawn_ticket_no'], 5, '0', STR_PAD_LEFT) ?></p>
-                        </div>
-                        <div class="bg-[#0a0b0d] p-5 border border-white/5 border-l-2 border-l-slate-500">
-                            <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Gateway Ref No.</p>
-                            <p class="text-lg font-black text-[#ff6b00] font-mono tracking-wider"><?= htmlspecialchars($pending_payment_data['reference_number'] ?? 'N/A') ?></p>
-                            <p class="text-xs font-mono text-slate-400 mt-1 uppercase">Method: <?= htmlspecialchars($pending_payment_data['payment_method'] ?? 'ONLINE') ?></p>
-                        </div>
-                        <div class="bg-[#0a0b0d] p-5 border border-white/5 border-l-2 border-l-[#00ff41]">
-                            <p class="text-[9px] text-[#00ff41] font-black uppercase tracking-widest mb-1">Amount Transferred</p>
-                            <p class="text-3xl font-black text-white font-mono tracking-tight">₱<?= number_format($paid_amount, 2) ?></p>
-                        </div>
-                        <div class="bg-[#0a0b0d] p-5 border border-white/5 border-l-2 border-l-purple-500">
-                            <p class="text-[9px] text-purple-400 font-black uppercase tracking-widest mb-1">System Detected Intent</p>
-                            <p class="text-lg font-black text-white uppercase mt-1"><?= $transaction_label ?></p>
-                            <p class="text-[9px] text-slate-500 font-mono mt-2 italic">*Matches accrued debt profile.</p>
-                        </div>
-                    </div>
-
-                    <form action="#" method="POST" class="grid grid-cols-2 gap-4 mt-auto">
-                        <input type="hidden" name="payment_id" value="<?= $pending_payment_data['payment_id'] ?>">
-                        <button type="button" class="bg-transparent border border-error-red/30 hover:bg-error-red/10 text-error-red py-5 font-black uppercase tracking-[0.2em] text-[10px] transition-all flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined text-sm">block</span> Reject Payment
-                        </button>
-                        <button type="button" class="bg-[#ff6b00] hover:bg-[#ff8533] text-black py-5 font-black uppercase tracking-[0.2em] text-[10px] shadow-[0_0_20px_rgba(255,107,0,0.3)] transition-all flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined text-sm">verified</span> Confirm & Execute
-                        </button>
-                    </form>
-                </div>
-
-            <?php elseif ($loan_data): ?>
+            <?php if ($loan_data): ?>
                 <?php 
                     $principal = floatval($loan_data['principal_amount']);
                     $calc = calculateDynamicInterest($principal, $loan_data['loan_date'], $loan_data['due_date']);
@@ -313,12 +261,12 @@ include '../../includes/header.php';
                     $monthly_inc = $principal * 0.05; 
 
                     if ($months == 1) {
-                        $redemption_total = $base_redeem;
+                        $redemption_total = $base_redeem + $SERVICE_CHARGE;
                     } else {
-                        $redemption_total = $base_redeem + (($months - 1) * $monthly_inc);
+                        $redemption_total = $base_redeem + (($months - 1) * $monthly_inc) + $SERVICE_CHARGE;
                     }
 
-                    $ticket_str = 'PT-' . str_pad($loan_data['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
+                    $ticket_str = 'PT-' . str_pad($loan_data['pawn_ticket_number'], 5, '0', STR_PAD_LEFT);
                     
                     $now = time();
                     $due = strtotime($loan_data['due_date']);
@@ -329,7 +277,7 @@ include '../../includes/header.php';
                     
                     <div class="flex justify-between items-start mb-6 shrink-0 border-b border-white/5 pb-6">
                         <div>
-                            <p class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Local Transaction Protocol</p>
+                            <p class="text-[10px] font-black text-[#00ff41] uppercase tracking-[0.2em] mb-1">Local Walk-In Protocol</p>
                             <h2 class="text-4xl font-black text-white uppercase tracking-tighter font-display"><?= $ticket_str ?></h2>
                             <p class="text-slate-400 text-xs mt-1 font-bold uppercase"><?= htmlspecialchars($loan_data['item_name'] ?? 'Vault Item') ?> <span class="font-normal opacity-50 mx-2">|</span> <?= htmlspecialchars($loan_data['last_name'] . ', ' . $loan_data['first_name']) ?></p>
                         </div>
@@ -364,7 +312,10 @@ include '../../includes/header.php';
                         </div>
                     </div>
                     
-                    <form action="#" method="POST" class="flex flex-col flex-1 gap-6">
+                    <form action="payments.php" method="POST" class="flex flex-col flex-1 gap-6">
+                        <input type="hidden" name="action" value="walk_in_payment">
+                        <input type="hidden" name="loan_id" value="<?= $loan_data['loan_id'] ?>">
+
                         <p class="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-center border-b border-white/5 pb-2">Select Execution Path</p>
                         
                         <div class="grid grid-cols-3 gap-4 shrink-0">
@@ -399,6 +350,12 @@ include '../../includes/header.php';
                             </label>
                         </div>
 
+                        <div class="bg-[#0a0b0d] border border-white/10 flex flex-col p-4 mt-2 focus-within:border-[#00ff41] transition-colors">
+                            <label class="text-slate-500 text-[9px] uppercase font-black tracking-[0.2em] mb-2">Physical O.R. / Receipt Number (Required)</label>
+                            <input type="text" name="or_number" placeholder="e.g. OR-882910" required
+                                   class="bg-transparent text-white font-mono text-sm outline-none placeholder-slate-700">
+                        </div>
+
                         <div class="bg-[#0a0b0d] p-6 border border-white/10 flex items-center justify-between mt-auto group focus-within:border-white/30 transition-colors">
                              <p class="text-slate-500 text-[10px] uppercase font-black tracking-[0.2em]">Required Tender</p>
                              <div class="flex items-center gap-2">
@@ -408,8 +365,8 @@ include '../../includes/header.php';
                              </div>
                         </div>
 
-                        <button type="button" class="w-full bg-[#00ff41] hover:bg-[#00cc33] text-black py-5 uppercase font-black tracking-[0.2em] text-[11px] shadow-[0_0_20px_rgba(0,255,65,0.2)] transition-all flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined text-sm">receipt_long</span> Post Transaction
+                        <button type="submit" class="w-full bg-[#00ff41] hover:bg-[#00cc33] text-black py-5 uppercase font-black tracking-[0.2em] text-[11px] shadow-[0_0_20px_rgba(0,255,65,0.2)] transition-all flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined text-sm">payments</span> Execute Cash Drop
                         </button>
                     </form>
                 </div>
@@ -421,7 +378,7 @@ include '../../includes/header.php';
                         <span class="material-symbols-outlined text-7xl text-slate-600 relative z-10">qr_code_scanner</span>
                     </div>
                     <h2 class="text-2xl font-black text-white uppercase tracking-widest font-display">System Idle</h2>
-                    <p class="text-[10px] font-mono text-slate-500 mt-3 uppercase tracking-widest max-w-xs leading-relaxed">Select a ticket from the left panel or scan a physical barcode to initiate transaction sequence.</p>
+                    <p class="text-[10px] font-mono text-slate-500 mt-3 uppercase tracking-widest max-w-xs leading-relaxed">Select a ticket from the left panel or scan a physical barcode to initiate local cash sequence.</p>
                 </div>
             <?php endif; ?>
         </div>
