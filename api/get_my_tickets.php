@@ -60,7 +60,8 @@ try {
     $response['message'] = count($formatted_tickets) > 0 ? 'Vault data synchronized.' : 'No active tickets.';
 
 } catch (PDOException $e) {
-    $response['message'] = 'System Error: Schema may not exist.';
+    // This will force the API to spit out the raw, exact database error!
+    $response['message'] = 'System Error: ' . $e->getMessage();
 }
 
 echo json_encode($response);
