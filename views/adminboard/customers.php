@@ -104,6 +104,7 @@ include '../../includes/header.php';
                 <thead class="bg-[#ff6b00]/10 border-b border-[#ff6b00]/20">
                     <tr>
                         <th class="px-6 py-4 text-[9px] font-black text-[#ff6b00] uppercase tracking-widest">Customer</th>
+                        <th class="px-6 py-4 text-[9px] font-black text-[#ff6b00] uppercase tracking-widest">ID Type</th>
                         <th class="px-6 py-4 text-[9px] font-black text-[#ff6b00] uppercase tracking-widest">Contact</th>
                         <th class="px-6 py-4 text-right text-[9px] font-black text-[#ff6b00] uppercase tracking-widest">Action</th>
                     </tr>
@@ -121,6 +122,12 @@ include '../../includes/header.php';
                                     <p class="text-[10px] text-[#ff6b00] font-mono"><?= htmlspecialchars($c['email'] ?? 'N/A') ?></p>
                                 </div>
                             </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-1 bg-[#ff6b00]/10 border border-[#ff6b00]/20 text-[#ff6b00] text-[9px] font-black uppercase tracking-widest">
+                                <span class="material-symbols-outlined text-[10px]">badge</span>
+                                <?= htmlspecialchars($c['id_type'] ?? 'ID Attached') ?>
+                            </span>
                         </td>
                         <td class="px-6 py-4">
                             <p class="text-xs text-white/80"><?= htmlspecialchars($c['contact_no'] ?? 'No contact') ?></p>
