@@ -22,24 +22,29 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
 
     <nav class="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
         
+        <a class="<?= $base_class ?> <?= ($current_page == 'customer_sandbox.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/customer_sandbox.php">
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'customer_sandbox.php') ? $active_icon : $inactive_icon ?>">sandbox</span>
+            Sandbox
+        </a>
+        
         <a class="<?= $base_class ?> <?= ($current_page == 'dashboard.php' || $current_page == 'index.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/dashboard.php">
             <span class="material-symbols-outlined text-lg <?= ($current_page == 'dashboard.php' || $current_page == 'index.php') ? $active_icon : $inactive_icon ?>">dashboard</span>
             Overview
         </a>
         
         <a class="<?= $base_class ?> <?= ($current_page == 'transactions.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/transactions.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'transactions.php') ? $active_icon : $inactive_icon ?>">point_of_sale</span>
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'transactions.php') ? $active_icon : $inactive_icon ?>">receipt_long</span>
             Ledger
         </a>
 
         <a class="<?= $base_class ?> <?= ($current_page == 'history.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/history.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'history.php') ? $active_icon : $inactive_icon ?>">inventory_2</span>
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'history.php') ? $active_icon : $inactive_icon ?>">history</span>
             Transactions
         </a>
 
-        <a href="payments.php" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-[#00ff41] transition-all group">
-            <span class="material-symbols-outlined text-lg group-hover:text-[#00ff41] transition-colors">point_of_sale</span>
-            <span class="text-[10px] font-black uppercase tracking-widest">Payment Node</span>
+        <a class="<?= $base_class ?> <?= ($current_page == 'payments.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/payments.php">
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'payments.php') ? $active_icon : $inactive_icon ?>">credit_card</span>
+            Payment Node
         </a>
 
         <a class="<?= $base_class ?> <?= ($current_page == 'customers.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/customers.php">
@@ -57,11 +62,16 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
             Personnel
         </a>
 
+        <a class="<?= $base_class ?> <?= ($current_page == 'reports.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/reports.php">
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'reports.php') ? $active_icon : $inactive_icon ?>">analytics</span>
+            Reports
+        </a>
+
         <div class="h-4"></div>
 
-        <a href="billing.php" class="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-[#00ff41] transition-all group">
-            <span class="material-symbols-outlined text-lg group-hover:text-[#00ff41] transition-colors">point_of_sale</span>
-            <span class="text-[10px] font-black uppercase tracking-widest">Subscriptions</span>
+        <a class="<?= $base_class ?> <?= ($current_page == 'billing.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/billing.php">
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'billing.php') ? $active_icon : $inactive_icon ?>">card_membership</span>
+            Subscriptions
         </a>
 
         <a class="<?= $base_class ?> <?= ($current_page == 'settings.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/settings.php">

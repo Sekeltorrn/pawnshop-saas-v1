@@ -22,23 +22,58 @@ $SERVICE_CHARGE = 5.00;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'walk_in_payment') {
     $loan_id = $_POST['loan_id'];
     $amount = floatval($_POST['amount']);
-    $type = $_POST['payment_type']; // 'interest', 'principal', or 'full_redemption'
+    $payment_type = $_POST['payment_type']; // 'interest', 'principal', or 'full_redemption'
     $or_number = $_POST['or_number'] ?? 'N/A';
 
     try {
-        // A. Insert the manual cash payment (leaving reference_number blank)
-        $stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.payments (loan_id, amount, payment_type, or_number) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$loan_id, $amount, $type, $or_number]);
+        $pdo->beginTransaction();
 
-        // B. Update the Vault Asset Status
-        $new_status = ($type === 'full_redemption') ? 'redeemed' : 'renewed';
+        // 1. Generate a secure Walk-In Reference
+        $ref_no = 'WLK-' . strtoupper(uniqid());
+
+        // 2. Insert Payment with the Channel labeled as 'Walk-In'
+        $stmt = $pdo->prepare("
+            INSERT INTO {$tenant_schema}.payments 
+            (loan_id, amount, payment_type, payment_date, reference_number, payment_channel, or_number) 
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'Walk-In', ?)
+        ");
+        $stmt->execute([$loan_id, $amount, $payment_type, $ref_no, $or_number]);
+
+        // 3. Update the Vault Asset Status
+        $new_status = ($payment_type === 'full_redemption') ? 'redeemed' : 'renewed';
         $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
         $upd_stmt->execute([$new_status, $loan_id]);
 
-        // Redirect to clear the form and show success message
-        header("Location: payments.php?msg=" . urlencode("Cash transaction successful. Asset marked as {$new_status}."));
+        // 4. Fetch Data for the Automated Receipt
+        $stmt = $pdo->prepare("
+            SELECT l.pawn_ticket_no, l.principal_amount, c.first_name, c.last_name 
+            FROM {$tenant_schema}.loans l 
+            JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
+            WHERE l.loan_id = ?
+        ");
+        $stmt->execute([$loan_id]);
+        $ticket_data = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        // 5. Save Receipt Data to Session to display after page reload
+        $_SESSION['last_receipt'] = [
+            'ticket_no' => 'PT-' . str_pad($ticket_data['pawn_ticket_no'], 5, '0', STR_PAD_LEFT),
+            'customer' => strtoupper($ticket_data['first_name'] . ' ' . $ticket_data['last_name']),
+            'amount' => $amount,
+            'type' => strtoupper(str_replace('_', ' ', $payment_type)),
+            'ref' => $ref_no,
+            'date' => date('Y-m-d H:i:s'),
+            'cashier' => substr($current_user_id, 0, 8),
+            'or_number' => $or_number,
+            'status' => $new_status
+        ];
+
+        $pdo->commit();
+
+        // Redirect to trigger receipt modal display
+        header("Location: payments.php?success=payment_logged&ref=" . urlencode($ref_no));
         exit();
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
+        $pdo->rollBack();
         die("Transaction Error: " . $e->getMessage());
     }
 }
@@ -183,17 +218,34 @@ include '../../includes/header.php';
                             <p class="text-[9px] uppercase tracking-widest font-black">No Remote Activity</p>
                         </div>
                     <?php else: ?>
-                        <?php foreach ($recent_online_payments as $p): ?>
-                            <div class="block p-3 bg-[#0a0b0d] border border-white/5 opacity-80 cursor-default">
+                        <?php foreach ($recent_online_payments as $p): 
+                            $channel = $p['payment_channel'] ?? 'Unknown';
+                            $channel_color = ($channel === 'Walk-In') ? '#00ff41' : '#ff6b00';
+                            $channel_bg = ($channel === 'Walk-In') ? '[#00ff41]/10' : '[#ff6b00]/10';
+                            $channel_border = ($channel === 'Walk-In') ? '[#00ff41]/20' : '[#ff6b00]/20';
+                            $channel_text = ($channel === 'Walk-In') ? 'text-[#00ff41]' : 'text-[#ff6b00]';
+                            
+                            $receipt_data = json_encode([
+                                'ticket_no' => 'PT-' . str_pad($p['pawn_ticket_no'], 5, '0', STR_PAD_LEFT),
+                                'customer' => strtoupper($p['last_name'] . ', ' . $p['first_name']),
+                                'amount' => $p['amount'],
+                                'type' => strtoupper(str_replace('_', ' ', $p['payment_type'] ?? 'Unknown')),
+                                'ref' => $p['reference_number'] ?? $p['or_number'] ?? 'N/A',
+                                'date' => $p['payment_date'] ?? date('Y-m-d H:i:s'),
+                                'channel' => $channel,
+                                'cashier' => substr($current_user_id, 0, 8)
+                            ]);
+                        ?>
+                            <button type="button" onclick="showReceipt(this)" data-receipt='<?= htmlspecialchars($receipt_data) ?>' class="w-full text-left p-3 bg-[#0a0b0d] border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all">
                                 <div class="flex justify-between items-center mb-1">
                                     <p class="text-white font-bold text-xs uppercase"><?= htmlspecialchars($p['last_name'] . ', ' . $p['first_name']) ?></p>
-                                    <span class="text-[9px] font-black text-[#ff6b00] bg-[#ff6b00]/10 border border-[#ff6b00]/20 px-1.5 py-0.5 uppercase tracking-wider">PayMongo</span>
+                                    <span class="text-[9px] font-black <?= $channel_text ?> bg-<?= $channel_bg ?> border border-<?= $channel_border ?> px-1.5 py-0.5 uppercase tracking-wider"><?= htmlspecialchars($channel) ?></span>
                                 </div>
                                 <div class="flex justify-between mt-2">
                                     <span class="text-[10px] text-slate-500 font-mono">PT-<?= str_pad($p['pawn_ticket_no'], 5, '0', STR_PAD_LEFT) ?></span>
                                     <span class="text-white font-mono font-bold text-xs">₱<?= number_format($p['amount'], 2) ?></span>
                                 </div>
-                            </div>
+                            </button>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
@@ -242,7 +294,7 @@ include '../../includes/header.php';
             </div>
         </div>
 
-        <div class="lg:col-span-8 flex flex-col h-full">
+        <div class="lg:col-span-8 flex flex-col h-full overflow-hidden">
             
             <?php if(isset($_GET['msg'])): ?>
                 <div class="mb-4 p-3 bg-[#00ff41]/10 border border-[#00ff41]/30 text-[#00ff41] text-[10px] font-black uppercase tracking-widest text-center shadow-[0_0_15px_rgba(0,255,65,0.1)]">
@@ -250,30 +302,31 @@ include '../../includes/header.php';
                 </div>
             <?php endif; ?>
 
-            <?php if ($loan_data): ?>
-                <?php 
-                    $principal = floatval($loan_data['principal_amount']);
-                    $calc = calculateDynamicInterest($principal, $loan_data['loan_date'], $loan_data['due_date']);
-                    $months = $calc['months']; 
+            <div id="panelContainer" class="flex-1 overflow-hidden flex">
+                <?php if ($loan_data): ?>
+                    <?php 
+                        $principal = floatval($loan_data['principal_amount']);
+                        $calc = calculateDynamicInterest($principal, $loan_data['loan_date'], $loan_data['due_date']);
+                        $months = $calc['months']; 
 
-                    $renewal_total = $calc['interest_amount'] + $SERVICE_CHARGE;
-                    $base_redeem = $principal * 1.00; 
-                    $monthly_inc = $principal * 0.05; 
+                        $renewal_total = $calc['interest_amount'] + $SERVICE_CHARGE;
+                        $base_redeem = $principal * 1.00; 
+                        $monthly_inc = $principal * 0.05; 
 
-                    if ($months == 1) {
-                        $redemption_total = $base_redeem + $SERVICE_CHARGE;
-                    } else {
-                        $redemption_total = $base_redeem + (($months - 1) * $monthly_inc) + $SERVICE_CHARGE;
-                    }
+                        if ($months == 1) {
+                            $redemption_total = $base_redeem + $SERVICE_CHARGE;
+                        } else {
+                            $redemption_total = $base_redeem + (($months - 1) * $monthly_inc) + $SERVICE_CHARGE;
+                        }
 
-                    $ticket_str = 'PT-' . str_pad($loan_data['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
-                    
-                    $now = time();
-                    $due = strtotime($loan_data['due_date']);
-                    $is_overdue = $now > $due;
-                    $days_overdue = $is_overdue ? floor(($now - $due) / (60 * 60 * 24)) : 0;
-                ?>
-                <div class="bg-[#141518] border border-white/5 p-8 shadow-2xl h-full flex flex-col relative overflow-hidden">
+                        $ticket_str = 'PT-' . str_pad($loan_data['pawn_ticket_no'], 5, '0', STR_PAD_LEFT);
+                        
+                        $now = time();
+                        $due = strtotime($loan_data['due_date']);
+                        $is_overdue = $now > $due;
+                        $days_overdue = $is_overdue ? floor(($now - $due) / (60 * 60 * 24)) : 0;
+                    ?>
+                    <div class="bg-[#141518] border border-white/5 p-8 shadow-2xl h-full w-full flex flex-col relative overflow-hidden">
                     
                     <div class="flex justify-between items-start mb-6 shrink-0 border-b border-white/5 pb-6">
                         <div>
@@ -369,20 +422,102 @@ include '../../includes/header.php';
                             <span class="material-symbols-outlined text-sm">payments</span> Execute Cash Drop
                         </button>
                     </form>
-                </div>
-
-            <?php else: ?>
-                <div class="bg-[#141518] border border-dashed border-white/10 flex flex-col items-center justify-center text-center p-20 h-full">
-                    <div class="relative mb-6 group">
-                        <div class="absolute inset-0 bg-[#00ff41]/20 blur-xl rounded-full opacity-50 group-hover:opacity-100 transition-opacity animate-pulse"></div>
-                        <span class="material-symbols-outlined text-7xl text-slate-600 relative z-10">qr_code_scanner</span>
                     </div>
-                    <h2 class="text-2xl font-black text-white uppercase tracking-widest font-display">System Idle</h2>
-                    <p class="text-[10px] font-mono text-slate-500 mt-3 uppercase tracking-widest max-w-xs leading-relaxed">Select a ticket from the left panel or scan a physical barcode to initiate local cash sequence.</p>
+                <?php else: ?>
+                    <div id="systemIdleScreen" class="bg-[#141518] border border-dashed border-white/10 flex flex-col items-center justify-center text-center p-20 w-full h-full">
+                        <div class="relative mb-6 group">
+                            <div class="absolute inset-0 bg-[#00ff41]/20 blur-xl rounded-full opacity-50 group-hover:opacity-100 transition-opacity animate-pulse"></div>
+                            <span class="material-symbols-outlined text-7xl text-slate-600 relative z-10">qr_code_scanner</span>
+                        </div>
+                        <h2 class="text-2xl font-black text-white uppercase tracking-widest font-display">System Idle</h2>
+                        <p class="text-[10px] font-mono text-slate-500 mt-3 uppercase tracking-widest max-w-xs leading-relaxed">Select a ticket from the left panel or scan a physical barcode to initiate local cash sequence.</p>
+                    </div>
+                <?php endif; ?>
+
+                <div id="receiptViewerScreen" class="hidden w-full h-full overflow-y-auto bg-[#141518] border border-white/5 p-8 shadow-2xl flex flex-col relative">
+                    <div class="shrink-0 mb-4 flex items-center justify-between border-b border-white/5 pb-4">
+                        <h3 class="text-lg font-black text-white uppercase tracking-tighter">Payment Receipt</h3>
+                        <button type="button" onclick="hideReceipt()" class="text-slate-400 hover:text-white transition-colors">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto custom-scrollbar">
+                        <div class="text-center mb-6 border-b-2 border-dashed border-white/20 pb-6">
+                            <h2 class="text-2xl font-black text-white tracking-tighter uppercase italic font-display">Origin <span class="text-[#00ff41]">Point</span></h2>
+                            <p class="text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-1">Official Payment Receipt</p>
+                            <p class="text-[10px] text-slate-500 font-mono uppercase" id="receiptCashier">Term: ---</p>
+                        </div>
+
+                        <div class="space-y-4 font-mono text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500 uppercase">Date/Time</span>
+                                <span class="text-white" id="receiptDate">---</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500 uppercase">Ref No.</span>
+                                <span class="text-white" id="receiptRef">---</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500 uppercase">Channel</span>
+                                <span class="text-white bg-white/10 px-1" id="receiptChannel">---</span>
+                            </div>
+                            
+                            <div class="border-y border-dashed border-white/20 py-4 my-4 space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500 uppercase">Client</span>
+                                    <span class="text-white font-bold" id="receiptCustomer">---</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500 uppercase">Pawn Ticket</span>
+                                    <span class="text-white font-bold" id="receiptTicket">---</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-500 uppercase">Type</span>
+                                    <span class="text-purple-400 font-bold" id="receiptType">---</span>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-between items-end mt-6">
+                                <span class="text-[10px] text-slate-500 uppercase tracking-widest">Amount Paid</span>
+                                <span class="text-2xl font-black text-[#00ff41] tracking-tighter" id="receiptAmount">₱0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="text-center mt-8 pt-6 border-t border-dashed border-white/20">
+                            <p class="text-[9px] text-slate-600 uppercase tracking-widest">Please keep this receipt for your records.</p>
+                        </div>
+                    </div>
                 </div>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+    function showReceipt(element) {
+        const receiptData = JSON.parse(element.getAttribute('data-receipt'));
+        
+        // Populate receipt viewer
+        document.getElementById('receiptCashier').innerText = 'Term: ' + receiptData.cashier;
+        document.getElementById('receiptDate').innerText = receiptData.date;
+        document.getElementById('receiptRef').innerText = receiptData.ref;
+        document.getElementById('receiptChannel').innerText = receiptData.channel.toUpperCase();
+        document.getElementById('receiptCustomer').innerText = receiptData.customer;
+        document.getElementById('receiptTicket').innerText = receiptData.ticket_no;
+        document.getElementById('receiptType').innerText = receiptData.type;
+        document.getElementById('receiptAmount').innerText = '₱' + parseFloat(receiptData.amount).toFixed(2);
+        
+        // Show receipt viewer, hide idle screen
+        document.getElementById('systemIdleScreen').style.display = 'none';
+        document.getElementById('receiptViewerScreen').classList.remove('hidden');
+    }
+    
+    function hideReceipt() {
+        // Hide receipt viewer, show idle screen
+        document.getElementById('receiptViewerScreen').classList.add('hidden');
+        document.getElementById('systemIdleScreen').style.display = 'flex';
+    }
+</script>
 
 <?php include '../../includes/footer.php'; ?>

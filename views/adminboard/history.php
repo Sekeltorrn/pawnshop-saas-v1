@@ -27,8 +27,8 @@ $sql = "
         c.first_name, 
         c.last_name
     FROM {$tenant_schema}.payments p
-    JOIN {$tenant_schema}.loans l ON p.loan_id = l.loan_id
-    JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id
+    LEFT JOIN {$tenant_schema}.loans l ON p.loan_id = l.loan_id
+    LEFT JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id
     WHERE 1=1
 ";
 

@@ -15,9 +15,44 @@ if (!$current_user_id) {
     exit();
 }
 
-// 2. FETCH REAL DATA
+$tenant_schema = $_SESSION['schema_name'] ?? 'public';
+$success_msg = '';
+
+// 2. HANDLE FORM SUBMISSION (UPDATE SETTINGS)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE " . $tenant_schema . ".tenant_settings 
+            SET ltv_percentage = ?, 
+                interest_rate = ?, 
+                service_fee = ?, 
+                gold_rate_18k = ?, 
+                gold_rate_21k = ?, 
+                gold_rate_24k = ?,
+                diamond_base_rate = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+        ");
+        
+        $stmt->execute([
+            floatval($_POST['ltv_percentage']),
+            floatval($_POST['interest_rate']),
+            floatval($_POST['service_fee']),
+            floatval($_POST['gold_rate_18k']),
+            floatval($_POST['gold_rate_21k']),
+            floatval($_POST['gold_rate_24k']),
+            floatval($_POST['diamond_base_rate'])
+        ]);
+        
+        $success_msg = "System parameters successfully updated and synchronized.";
+    } catch (PDOException $e) {
+        die("Settings Update Error: " . $e->getMessage());
+    }
+}
+
+// 3. FETCH REAL DATA (SHOP INFO)
 try {
-    $stmt = $pdo->prepare("SELECT id, business_name as shop_name, shop_slug FROM public.profiles WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, business_name as shop_name, shop_slug, shop_code FROM public.profiles WHERE id = ?");
     $stmt->execute([$current_user_id]);
     $shopData = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -28,6 +63,24 @@ try {
     $displayShopName = $shopData['shop_name'] ?? 'My Pawnshop';
     $_SESSION['tenant_id'] = $shopData['id'];
 
+} catch (PDOException $e) {
+    die("Database Error: " . $e->getMessage());
+}
+
+// 4. FETCH CURRENT SETTINGS
+try {
+    $stmt = $pdo->prepare("SELECT * FROM " . $tenant_schema . ".tenant_settings WHERE id = 1");
+    $stmt->execute();
+    $settings = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Fallback defaults if the table is empty
+    if (!$settings) {
+        $settings = [
+            'ltv_percentage' => 60.00, 'interest_rate' => 3.50, 'service_fee' => 5.00,
+            'gold_rate_18k' => 3000.00, 'gold_rate_21k' => 3500.00, 'gold_rate_24k' => 4200.00,
+            'diamond_base_rate' => 50000.00
+        ];
+    }
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
 }
@@ -80,66 +133,180 @@ include '../../includes/header.php';
         <div class="lg:col-span-9">
             
             <div id="cfg-ops" class="config-pane space-y-6 animate-in fade-in duration-300">
-                <div class="bg-[#141518] border border-white/5 p-6 rounded-sm">
-                    <div class="flex items-center gap-3 border-b border-[#ff6b00]/20 pb-3 mb-6">
-                        <span class="material-symbols-outlined text-[#ff6b00] text-lg">percent</span>
-                        <h3 class="text-[11px] font-black uppercase tracking-[0.3em] text-white">Interest_Logic_Matrix</h3>
+                <?php if ($success_msg): ?>
+                    <div class="bg-[#00ff41]/10 border border-[#00ff41]/50 text-[#00ff41] p-4 flex items-center gap-3">
+                        <span class="material-symbols-outlined text-lg">check_circle</span>
+                        <span class="text-xs font-mono uppercase tracking-widest font-bold"><?= $success_msg ?></span>
                     </div>
+                <?php endif; ?>
+
+                <form method="POST" class="space-y-6">
+                    <input type="hidden" name="update_settings" value="1">
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Base Monthly Interest Rate</label>
-                            <div class="flex items-center bg-[#0a0b0d] border border-white/10 px-3 focus-within:border-[#ff6b00]/50 transition-colors">
-                                <span class="material-symbols-outlined text-slate-600 text-sm">trending_up</span>
-                                <input type="number" value="3.0" step="0.1" class="w-full bg-transparent border-none text-white text-sm font-mono p-3 outline-none text-right">
-                                <span class="text-[#ff6b00] font-black text-xs ml-2">%</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Liquidated Damages (Penalty)</label>
-                            <div class="flex items-center bg-[#0a0b0d] border border-white/10 px-3 focus-within:border-[#ff6b00]/50 transition-colors">
-                                <span class="material-symbols-outlined text-slate-600 text-sm">warning</span>
-                                <input type="number" value="2.0" step="0.1" class="w-full bg-transparent border-none text-white text-sm font-mono p-3 outline-none text-right">
-                                <span class="text-[#ff6b00] font-black text-xs ml-2">%</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        
+                        <div class="bg-[#141518] p-8 border border-white/5 relative overflow-hidden group">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-[#ff6b00]/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+                            <h3 class="text-white font-black mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] border-b border-white/5 pb-4">
+                                <span class="material-symbols-outlined text-[#ff6b00] text-lg">account_balance</span> Loan Engine Variables
+                            </h3>
 
-                <div class="bg-[#141518] border border-white/5 p-6 rounded-sm">
-                    <div class="flex items-center gap-3 border-b border-[#ff6b00]/20 pb-3 mb-6">
-                        <span class="material-symbols-outlined text-[#ff6b00] text-lg">calendar_month</span>
-                        <h3 class="text-[11px] font-black uppercase tracking-[0.3em] text-white">Temporal_Constraints</h3>
+                            <div class="space-y-5">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Max Loan-to-Value (LTV) %</label>
+                                    <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-[#ff6b00]/50 transition-colors">
+                                        <input type="number" step="0.01" name="ltv_percentage" value="<?= htmlspecialchars($settings['ltv_percentage']) ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
+                                        <span class="text-slate-500 font-mono pr-4">%</span>
+                                    </div>
+                                    <p class="text-[8px] text-slate-600 font-mono uppercase mt-1">Cap on principal based on item appraisal.</p>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Standard Monthly Interest Rate %</label>
+                                    <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-[#ff6b00]/50 transition-colors">
+                                        <input type="number" step="0.01" name="interest_rate" value="<?= htmlspecialchars($settings['interest_rate']) ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
+                                        <span class="text-slate-500 font-mono pr-4">%</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Fixed Service Fee (₱)</label>
+                                    <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-[#ff6b00]/50 transition-colors">
+                                        <span class="text-slate-500 font-mono pl-4">₱</span>
+                                        <input type="number" step="0.01" name="service_fee" value="<?= htmlspecialchars($settings['service_fee']) ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#141518] p-8 border border-white/5 relative overflow-hidden group">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+                            <h3 class="text-white font-black mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] border-b border-white/5 pb-4">
+                                <span class="material-symbols-outlined text-purple-500 text-lg">diamond</span> Market Rates
+                            </h3>
+
+                            <div class="space-y-5">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="col-span-2">
+                                        <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">18K Gold Purity (Per Gram)</label>
+                                        <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-purple-500/50 transition-colors">
+                                            <span class="text-slate-500 font-mono pl-4">₱</span>
+                                            <input type="number" step="0.01" name="gold_rate_18k" value="<?= htmlspecialchars($settings['gold_rate_18k']) ?>" class="w-full bg-transparent p-4 text-purple-400 font-bold text-xs font-mono outline-none">
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">21K Gold (Per Gram)</label>
+                                        <input type="number" step="0.01" name="gold_rate_21k" value="<?= htmlspecialchars($settings['gold_rate_21k']) ?>" class="w-full bg-[#0a0b0d] border border-white/5 p-3 text-white text-xs font-mono outline-none focus:border-purple-500/50">
+                                    </div>
+                                    <div>
+                                        <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1\">24K Gold (Per Gram)</label>
+                                        <input type="number" step="0.01" name="gold_rate_24k" value="<?= htmlspecialchars($settings['gold_rate_24k']) ?>" class="w-full bg-[#0a0b0d] border border-white/5 p-3 text-white text-xs font-mono outline-none focus:border-purple-500/50">
+                                    </div>
+                                </div>
+
+                                <div class="pt-2 border-t border-white/5">
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1 mt-3">Diamond Base Rate (Per Carat)</label>
+                                    <div class="flex items-center bg-[#0f1115] border border-white/5 focus-within:border-purple-500/50 transition-colors">
+                                        <span class="text-slate-500 font-mono pl-4">₱</span>
+                                        <input type="number" step="0.01" name="diamond_base_rate" value="<?= htmlspecialchars($settings['diamond_base_rate']) ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Standard Term</label>
-                            <div class="flex items-center bg-[#0a0b0d] border border-white/10 px-3 focus-within:border-[#ff6b00]/50 transition-colors">
-                                <input type="number" value="30" class="w-full bg-transparent border-none text-white text-sm font-mono p-3 outline-none text-right">
-                                <span class="text-slate-500 font-black text-[9px] uppercase tracking-widest ml-2">Days</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Grace Period</label>
-                            <div class="flex items-center bg-[#0a0b0d] border border-white/10 px-3 focus-within:border-[#00ff41]/50 transition-colors">
-                                <input type="number" value="3" class="w-full bg-transparent border-none text-[#00ff41] text-sm font-mono p-3 outline-none text-right">
-                                <span class="text-slate-500 font-black text-[9px] uppercase tracking-widest ml-2">Days</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Rematado Threshold</label>
-                            <div class="flex items-center bg-[#0a0b0d] border border-white/10 px-3 focus-within:border-error-red/50 transition-colors">
-                                <input type="number" value="90" class="w-full bg-transparent border-none text-error-red text-sm font-mono p-3 outline-none text-right">
-                                <span class="text-slate-500 font-black text-[9px] uppercase tracking-widest ml-2">Days</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    <button type="submit" class="w-full bg-[#00ff41] hover:bg-[#00cc33] text-black font-black py-4 uppercase tracking-[0.2em] text-[11px] shadow-[0_0_20px_rgba(0,255,65,0.2)] hover:shadow-[0_0_30px_rgba(0,255,65,0.4)] transition-all flex items-center justify-center gap-2">
+                        <span class="material-symbols-outlined text-sm">save</span> Synchronize System Parameters
+                    </button>
+                </form>
             </div>
 
             <div id="cfg-portal" class="config-pane hidden animate-in fade-in duration-300">
                 <div class="space-y-6">
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        <div class="lg:col-span-4 bg-[#141518] border border-white/5 p-6 rounded-sm h-fit">
+                            <h2 class="text-lg font-bold text-white mb-1">App Portal Settings</h2>
+                            <p class="text-xs text-slate-500 mb-6 uppercase tracking-wider">Configure Customer Access</p>
+                            
+                            <form action="update_slug.php" method="POST" class="space-y-6">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Shop Connection Code</label>
+                                    <div class="w-full bg-[#0a0b0d] border border-white/5 rounded px-4 py-3 text-[#00ff41] font-mono font-bold text-lg">
+                                        <?= htmlspecialchars($shopData['shop_code'] ?? 'N/A') ?>
+                                    </div>
+                                    <p class="text-[9px] text-slate-600 mt-2 ml-1">Share this code for mobile app pairing.</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Custom Link Handle</label>
+                                    <div class="flex items-center bg-[#0a0b0d] border border-white/5 overflow-hidden focus-within:ring-1 focus-within:ring-[#00ff41] transition-all">
+                                        <span class="px-3 text-slate-500 text-xs font-mono border-r border-white/5">/shop/</span>
+                                        <input 
+                                            type="text" 
+                                            name="new_slug" 
+                                            value="<?= htmlspecialchars($shopData['shop_slug'] ?? '') ?>" 
+                                            placeholder="marilao-gold" 
+                                            required 
+                                            class="w-full bg-transparent px-4 py-2.5 text-white outline-none text-sm font-bold"
+                                        >
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="w-full bg-[#ff6b00] text-black font-black py-3 uppercase tracking-[0.2em] text-xs hover:bg-[#ff8c1a] transition-all active:scale-95 shadow-[0_0_20px_rgba(255,107,0,0.3)]">
+                                    Update Portal Link
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="lg:col-span-8 bg-[#141518] border border-white/5 rounded overflow-hidden shadow-xl flex flex-col h-full">
+                            <div class="bg-[#0a0b0d] border-b border-white/5 px-6 py-4 flex items-center justify-between">
+                                <div>
+                                    <h2 class="text-sm font-bold text-white uppercase tracking-widest">Live Preview Link</h2>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="relative flex h-2 w-2">
+                                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ff41] opacity-75"></span>
+                                      <span class="relative inline-flex rounded-full h-2 w-2 bg-[#00ff41]"></span>
+                                    </span>
+                                    <span class="text-[10px] font-bold text-[#00ff41] uppercase">System Active</span>
+                                </div>
+                            </div>
+
+                            <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                                <?php if(!empty($shopData['shop_slug'])): ?>
+                                    <div class="w-full max-w-md">
+                                        <p class="text-slate-400 text-sm mb-6 leading-relaxed">Your customers can visit this link to view your shop details and download the mobile app.</p>
+                                        
+                                        <div class="p-6 bg-[#0a0b0d] rounded border border-white/5 group hover:border-[#00ff41]/50 transition-all">
+                                            <p class="text-[9px] text-slate-600 uppercase font-bold tracking-[0.2em] mb-3">Public Access URL</p>
+                                            
+                                            <a href="<?= (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/views/public/shop.php?code=' . htmlspecialchars($shopData['shop_slug'] ?? '') ?>" target="_blank" class="text-xl md:text-[18px] text-[#00ff41] hover:text-[#00ff41]/80 font-mono break-all transition-colors underline decoration-slate-800 underline-offset-8">
+                                                <?= $_SERVER['HTTP_HOST'] ?>/views/public/shop.php?code=<?= htmlspecialchars($shopData['shop_slug'] ?? '') ?>
+                                            </a>
+                                        </div>
+
+                                        <div class="mt-8 flex justify-center gap-4">
+                                            <div class="text-center">
+                                                <div class="text-lg font-bold text-white">--</div>
+                                                <div class="text-[10px] text-slate-500 uppercase">Page Visits</div>
+                                            </div>
+                                            <div class="w-px h-8 bg-slate-800"></div>
+                                            <div class="text-center">
+                                                <div class="text-lg font-bold text-white">--</div>
+                                                <div class="text-[10px] text-slate-500 uppercase">App Downloads</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="p-8 border-2 border-dashed border-white/5">
+                                        <span class="material-symbols-outlined text-4xl text-slate-700 mb-2 block">link</span>
+                                        <p class="text-slate-500 italic font-medium text-sm">Please set a custom link handle on the left to activate your portal preview.</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
                     
                     <div class="bg-[#0a0b0d] border border-white/5 p-4 rounded-sm relative">
                         <div class="absolute top-2 right-4 flex items-center gap-2 z-20">
