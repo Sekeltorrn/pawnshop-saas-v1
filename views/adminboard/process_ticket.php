@@ -13,7 +13,10 @@ if (!$current_user_id) {
     die("Unauthorized Access.");
 }
 
-$tenant_schema = 'tenant_pwn_18e601'; // Ensure this matches your live schema
+$tenant_schema = $_SESSION['schema_name'] ?? null;
+if (!$tenant_schema) {
+    die("Unauthorized: No tenant context.");
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     

@@ -9,7 +9,10 @@ require_once '../../config/db_connect.php';
 
 // 1. SECURITY CHECK
 $current_user_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? 'DEMO_NODE_01';
-$tenant_schema = 'tenant_pwn_18e601';
+$schemaName = $_SESSION['schema_name'] ?? null;
+if (!$schemaName) {
+    die("Unauthorized: No tenant context.");
+}
 
 // 2. SYSTEM SETTINGS
 $RATE_MONTH_1   = 3.5;
@@ -33,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         // 2. Insert Payment with the Channel labeled as 'Walk-In'
         $stmt = $pdo->prepare("
-            INSERT INTO {$tenant_schema}.payments 
+            INSERT INTO \"{$schemaName}\".payments 
             (loan_id, amount, payment_type, payment_date, reference_number, payment_channel, or_number) 
             VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 'Walk-In', ?)
         ");
@@ -41,14 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         // 3. Update the Vault Asset Status
         $new_status = ($payment_type === 'full_redemption') ? 'redeemed' : 'renewed';
-        $upd_stmt = $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = ? WHERE loan_id = ?");
+        $upd_stmt = $pdo->prepare("UPDATE \"{$schemaName}\".loans SET status = ? WHERE loan_id = ?");
         $upd_stmt->execute([$new_status, $loan_id]);
 
         // 4. Fetch Data for the Automated Receipt
         $stmt = $pdo->prepare("
             SELECT l.pawn_ticket_no, l.principal_amount, c.first_name, c.last_name 
-            FROM {$tenant_schema}.loans l 
-            JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
+            FROM \"{$schemaName}\".loans l 
+            JOIN \"{$schemaName}\".customers c ON l.customer_id = c.customer_id 
             WHERE l.loan_id = ?
         ");
         $stmt->execute([$loan_id]);
@@ -122,9 +125,9 @@ $recent_online_payments = [];
 try {
     $stmt = $pdo->prepare("
         SELECT p.*, l.pawn_ticket_no, c.first_name, c.last_name 
-        FROM {$tenant_schema}.payments p
-        JOIN {$tenant_schema}.loans l ON p.loan_id = l.loan_id
-        JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id
+        FROM \"{$schemaName}\".payments p
+        JOIN \"{$schemaName}\".loans l ON p.loan_id = l.loan_id
+        JOIN \"{$schemaName}\".customers c ON l.customer_id = c.customer_id
         WHERE p.reference_number IS NOT NULL 
         ORDER BY p.payment_date DESC LIMIT 15
     ");
@@ -137,9 +140,9 @@ $active_loans = [];
 try {
     $stmt = $pdo->prepare("
         SELECT l.pawn_ticket_no, l.due_date, i.item_name, c.first_name, c.last_name 
-        FROM {$tenant_schema}.loans l 
-        LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id 
-        LEFT JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
+        FROM \"{$schemaName}\".loans l 
+        LEFT JOIN \"{$schemaName}\".inventory i ON l.item_id = i.item_id 
+        LEFT JOIN \"{$schemaName}\".customers c ON l.customer_id = c.customer_id 
         WHERE l.status IN ('active', 'renewed') 
         ORDER BY l.due_date ASC LIMIT 50
     ");
@@ -158,9 +161,9 @@ if (isset($_GET['select_ticket']) || isset($_GET['search_ticket'])) {
     try {
         $stmt = $pdo->prepare("
             SELECT l.*, i.item_name, i.item_condition, c.first_name, c.last_name 
-            FROM {$tenant_schema}.loans l 
-            LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id
-            JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
+            FROM \"{$schemaName}\".loans l 
+            LEFT JOIN \"{$schemaName}\".inventory i ON l.item_id = i.item_id
+            JOIN \"{$schemaName}\".customers c ON l.customer_id = c.customer_id 
             WHERE l.pawn_ticket_no = ?
         ");
         

@@ -9,19 +9,23 @@ $data = json_decode(file_get_contents("php://input"), true);
 $ticket_no = $data['ticket_no'] ?? null;
 $type = $data['payment_type'] ?? 'renewal'; // 'renewal', 'redemption', or 'principal'
 $custom_amount = $data['amount'] ?? null; // Added to catch manual inputs for Partial Payments
+$tenant_schema = $data['tenant_schema'] ?? null;
 
 if (!$ticket_no) {
     echo json_encode(['success' => false, 'message' => 'Missing ticket number']);
     exit;
 }
 
-$tenant_schema = 'tenant_pwn_18e601'; // Hardcoded for demo
+if (!$tenant_schema) {
+    echo json_encode(['success' => false, 'message' => 'Unauthorized: No tenant context']);
+    exit;
+}
 
 try {
     // 2. FETCH TICKET & CUSTOMER INFO
     $stmt = $pdo->prepare("SELECT l.*, c.first_name, c.last_name, c.email, c.contact_no 
-                           FROM {$tenant_schema}.loans l 
-                           JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id 
+                           FROM \"{$tenant_schema}\".loans l 
+                           JOIN \"{$tenant_schema}\".customers c ON l.customer_id = c.customer_id 
                            WHERE l.pawn_ticket_no = ?");
     $stmt->execute([str_replace('PT-', '', $ticket_no)]);
     $loan = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -55,8 +59,8 @@ try {
     }
     
     // 4. GENERATE UNIQUE REFERENCE FOR WEBHOOK
-    // Format: PT-123-RENEW-1711234567
-    $reference = "PT-" . $loan['pawn_ticket_no'] . "-" . $intent . "-" . time();
+    // Format: PT-{tenant_schema}-{ticket}-{intent}-{timestamp}
+    $reference = "PT-" . $tenant_schema . "-" . $loan['pawn_ticket_no'] . "-" . $intent . "-" . time();
 
     $customer_info = [
         'name' => $loan['first_name'] . ' ' . $loan['last_name'],

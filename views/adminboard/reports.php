@@ -14,7 +14,10 @@ if (!$current_user_id) {
     exit();
 }
 
-$tenant_schema = 'tenant_pwn_18e601'; 
+$tenant_schema = $_SESSION['schema_name'] ?? null;
+if (!$tenant_schema) {
+    die("Unauthorized: No tenant context.");
+} 
 
 // 2. DATE FILTERING LOGIC
 // Default to the current month if no dates are selected

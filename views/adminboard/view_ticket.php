@@ -22,7 +22,10 @@ if (!$ticket_id) {
     exit();
 }
 
-$tenant_schema = 'tenant_pwn_18e601'; // Hardcoded for demo
+$tenant_schema = $_SESSION['schema_name'] ?? null;
+if (!$tenant_schema) {
+    die("Unauthorized: No tenant context.");
+}
 
 // 2. FETCH LOAN & CUSTOMER INFO
 try {

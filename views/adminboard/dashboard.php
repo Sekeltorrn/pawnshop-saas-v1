@@ -9,7 +9,7 @@ require_once '../../config/db_connect.php';
 
 // 1. SECURITY CHECK
 $current_user_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? 'DEMO_NODE_01';
-$tenant_schema = $_SESSION['schema_name'] ?? 'public';
+$schemaName = $_SESSION['schema_name'] ?? 'public';
 
 // ==============================================================================
 // 2. FETCH REAL-TIME ANALYTICS FROM DATABASE
@@ -21,19 +21,19 @@ try {
             COALESCE(SUM(principal_amount), 0) as total_capital_out,
             COALESCE(SUM(principal_amount * (interest_rate / 100)), 0) as expected_monthly_interest,
             COUNT(loan_id) as total_active_loans
-        FROM " . $tenant_schema . ".loans 
+        FROM \"{$schemaName}\".loans 
         WHERE status = 'active'
     ");
     $stmt->execute();
     $financials = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // B. Vault Capacity (Items currently secured)
-    $stmt = $pdo->prepare("SELECT COUNT(item_id) as vaulted_items FROM " . $tenant_schema . ".inventory WHERE item_status = 'in_vault'");
+    $stmt = $pdo->prepare("SELECT COUNT(item_id) as vaulted_items FROM \"{$schemaName}\".inventory WHERE item_status = 'in_vault'");
     $stmt->execute();
     $vault = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // C. Action Alerts (Pending Customers)
-    $stmt = $pdo->prepare("SELECT COUNT(customer_id) as pending_kyc FROM " . $tenant_schema . ".customers WHERE status = 'pending'");
+    $stmt = $pdo->prepare("SELECT COUNT(customer_id) as pending_kyc FROM \"{$schemaName}\".customers WHERE status = 'pending'");
     $stmt->execute();
     $alerts = $stmt->fetch(PDO::FETCH_ASSOC);
 

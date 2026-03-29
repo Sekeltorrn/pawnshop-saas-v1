@@ -28,7 +28,10 @@ try {
     $displayShopName = $shopData['shop_name'] ?? 'My Pawnshop';
     $_SESSION['tenant_id'] = $shopData['id'];
 
-    $tenant_schema = 'tenant_pwn_18e601'; 
+    $tenant_schema = $_SESSION['schema_name'] ?? null;
+    if (!$tenant_schema) {
+        die("Unauthorized: No tenant context.");
+    } 
 
     // --- CALCULATE LIVE DASHBOARD METRICS ---
     $metricsStmt = $pdo->prepare("

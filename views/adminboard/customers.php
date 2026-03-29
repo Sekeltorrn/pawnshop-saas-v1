@@ -20,7 +20,7 @@ try {
         $action = $_POST['action_type'];
         $new_status = ($action === 'approve') ? 'verified' : 'unverified';
         
-        $stmt = $pdo->prepare("UPDATE customers SET status = ? WHERE customer_id = ?");
+        $stmt = $pdo->prepare("UPDATE \"{$schemaName}\".customers SET status = ? WHERE customer_id = ?");
         $stmt->execute([$new_status, $target_id]);
         
         $msg = ($action === 'approve') ? 'Customer Verified Successfully!' : 'Request Rejected.';
@@ -38,7 +38,7 @@ try {
         $generated_email = $clean_name . rand(100, 999) . '@walkin.local';
         $hashed_password = password_hash('Pawnereno2026', PASSWORD_DEFAULT);
         
-        $stmt = $pdo->prepare("INSERT INTO customers (first_name, last_name, email, contact_no, password, is_walk_in, status) VALUES (?, ?, ?, ?, ?, TRUE, 'verified')");
+        $stmt = $pdo->prepare("INSERT INTO \"{$schemaName}\".customers (first_name, last_name, email, contact_no, password, is_walk_in, status) VALUES (?, ?, ?, ?, ?, TRUE, 'verified')");
         $stmt->execute([$first_name, $last_name, $generated_email, $contact, $hashed_password]);
         
         header("Location: customers.php?success=added");
@@ -46,7 +46,7 @@ try {
     }
 
     // 4. FETCH PENDING REQUESTS (Verification Queue)
-    $stmtPending = $pdo->query("SELECT * FROM customers WHERE status = 'pending' ORDER BY created_at DESC");
+    $stmtPending = $pdo->query("SELECT * FROM \"{$schemaName}\".customers WHERE status = 'pending' ORDER BY created_at DESC");
     $pendingCustomers = $stmtPending->fetchAll(PDO::FETCH_ASSOC);
     $hasPending = count($pendingCustomers) > 0;
 
@@ -62,7 +62,7 @@ try {
         $filterSql = "AND status != 'pending'";
     }
 
-    $stmt = $pdo->query("SELECT * FROM customers WHERE 1=1 $filterSql ORDER BY last_name ASC");
+    $stmt = $pdo->query("SELECT * FROM \"{$schemaName}\".customers WHERE 1=1 $filterSql ORDER BY last_name ASC");
     $mainCustomers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {

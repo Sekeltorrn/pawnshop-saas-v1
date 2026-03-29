@@ -38,8 +38,8 @@ try {
             l.due_date, 
             l.status,
             i.item_name
-        FROM {$tenant_schema}.loans l
-        LEFT JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id
+        FROM \"{$tenant_schema}\".loans l
+        LEFT JOIN \"{$tenant_schema}\".inventory i ON l.item_id = i.item_id
         WHERE l.customer_id = ? AND l.status = 'active'
         ORDER BY l.created_at DESC
     ");

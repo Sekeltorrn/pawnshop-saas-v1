@@ -86,7 +86,7 @@ if ($uploadResponse['code'] >= 200 && $uploadResponse['code'] < 300) {
     try {
         // 🔥 FIXED: Using id_image_url, id_type, and id_number to match your schema!
         $stmt = $pdo->prepare("
-            UPDATE {$tenant_schema}.customers 
+            UPDATE \"{$tenant_schema}\".customers 
             SET id_image_url = ?, 
                 id_type = ?, 
                 id_number = ?, 

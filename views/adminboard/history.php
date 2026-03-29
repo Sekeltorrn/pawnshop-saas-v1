@@ -9,7 +9,10 @@ require_once '../../config/db_connect.php';
 
 // 1. SECURITY CHECK
 $current_user_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? 'DEMO_NODE_01';
-$tenant_schema = 'tenant_pwn_18e601';
+$schemaName = $_SESSION['schema_name'] ?? null;
+if (!$schemaName) {
+    die("Unauthorized: No tenant context.");
+}
 
 // 2. SEARCH & FILTER LOGIC
 $search_query = $_GET['search'] ?? '';
@@ -26,9 +29,9 @@ $sql = "
         l.pawn_ticket_no,
         c.first_name, 
         c.last_name
-    FROM {$tenant_schema}.payments p
-    LEFT JOIN {$tenant_schema}.loans l ON p.loan_id = l.loan_id
-    LEFT JOIN {$tenant_schema}.customers c ON l.customer_id = c.customer_id
+    FROM \"{$schemaName}\".payments p
+    LEFT JOIN \"{$schemaName}\".loans l ON p.loan_id = l.loan_id
+    LEFT JOIN \"{$schemaName}\".customers c ON l.customer_id = c.customer_id
     WHERE 1=1
 ";
 

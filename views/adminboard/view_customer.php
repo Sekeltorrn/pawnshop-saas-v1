@@ -34,7 +34,7 @@ try {
         // A. REJECT VERIFICATION
         if ($action === 'reject') {
             $reason = $_POST['reject_reason'] ?? '';
-            $stmt = $pdo->prepare("UPDATE customers SET status = 'unverified' WHERE customer_id = ?");
+            $stmt = $pdo->prepare("UPDATE \"{$schemaName}\".customers SET status = 'unverified' WHERE customer_id = ?");
             $stmt->execute([$customer_id]);
             
             $perform_log = true;
@@ -50,10 +50,10 @@ try {
             $contact = $_POST['contact_no'] ?? '';
             $birthday = $_POST['birthday'] ?? '';
             $address = $_POST['address'] ?? '';
-            $id_type = $_POST['valid_id_type'] ?? '';
-            $id_num = $_POST['valid_id_num'] ?? '';
+            $id_type = $_POST['id_type'] ?? '';
+            $id_num = $_POST['id_number'] ?? '';
             
-            $stmt = $pdo->prepare("UPDATE customers SET first_name=?, middle_name=?, last_name=?, email=?, contact_no=?, birthday=?, address=?, valid_id_type=?, valid_id_num=?, status='verified' WHERE customer_id=?");
+            $stmt = $pdo->prepare("UPDATE \"{$schemaName}\".customers SET first_name=?, middle_name=?, last_name=?, email=?, contact_no=?, birthday=?, address=?, id_type=?, id_number=?, status='verified' WHERE customer_id=?");
             $stmt->execute([$fname, $mname, $lname, $email, $contact, $birthday, $address, $id_type, $id_num, $customer_id]);
             
             $perform_log = true;
@@ -69,10 +69,10 @@ try {
             $contact = $_POST['contact_no'] ?? '';
             $birthday = $_POST['birthday'] ?? '';
             $address = $_POST['address'] ?? '';
-            $id_type = $_POST['valid_id_type'] ?? '';
-            $id_num = $_POST['valid_id_num'] ?? '';
+            $id_type = $_POST['id_type'] ?? '';
+            $id_num = $_POST['id_number'] ?? '';
             
-            $stmt = $pdo->prepare("UPDATE customers SET first_name=?, middle_name=?, last_name=?, email=?, contact_no=?, birthday=?, address=?, valid_id_type=?, valid_id_num=? WHERE customer_id=?");
+            $stmt = $pdo->prepare("UPDATE \"{$schemaName}\".customers SET first_name=?, middle_name=?, last_name=?, email=?, contact_no=?, birthday=?, address=?, id_type=?, id_number=? WHERE customer_id=?");
             $stmt->execute([$fname, $mname, $lname, $email, $contact, $birthday, $address, $id_type, $id_num, $customer_id]);
             
             $perform_log = true;
@@ -86,7 +86,7 @@ try {
     }
 
     // 3. FETCH CUSTOMER DATA
-    $stmt = $pdo->prepare("SELECT * FROM customers WHERE customer_id = ?");
+    $stmt = $pdo->prepare("SELECT * FROM \"{$schemaName}\".customers WHERE customer_id = ?");
     $stmt->execute([$customer_id]);
     $customer = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -188,11 +188,11 @@ include '../../includes/header.php';
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="text-[9px] text-slate-500 font-black uppercase tracking-widest block mb-2">ID Type</label>
-                        <input type="text" name="valid_id_type" value="<?= htmlspecialchars($customer['valid_id_type'] ?? '') ?>" class="w-full bg-[#0a0b0d] border border-white/5 p-4 text-white text-xs font-mono outline-none focus:border-[#ff6b00]/50 transition-colors">
+                        <input type="text" name="id_type" value="<?= htmlspecialchars($customer['id_type'] ?? '') ?>" class="w-full bg-[#0a0b0d] border border-white/5 p-4 text-white text-xs font-mono outline-none focus:border-[#ff6b00]/50 transition-colors">
                     </div>
                     <div>
                         <label class="text-[9px] text-[#00ff41] font-black uppercase tracking-widest block mb-2">ID Number</label>
-                        <input type="text" name="valid_id_num" value="<?= htmlspecialchars($customer['valid_id_num'] ?? '') ?>" class="w-full bg-[#0a0b0d] border border-[#00ff41]/30 p-4 text-white text-xs font-mono outline-none focus:border-[#00ff41]/50 transition-colors" placeholder="XXXX-XXXX-XXXX">
+                        <input type="text" name="id_number" value="<?= htmlspecialchars($customer['id_number'] ?? '') ?>" class="w-full bg-[#0a0b0d] border border-[#00ff41]/30 p-4 text-white text-xs font-mono outline-none focus:border-[#00ff41]/50 transition-colors" placeholder="XXXX-XXXX-XXXX">
                     </div>
                 </div>
             </div>
@@ -264,12 +264,20 @@ include '../../includes/header.php';
             <!-- Documents Section -->
             <div class="bg-[#141518] border border-white/5 p-8">
                 <h3 class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-6">Submitted Documents</h3>
-                <?php if(!empty($customer['id_image_path'])): ?>
+                
+                <?php if(!empty($customer['id_image_url'])): ?>
                     <div class="space-y-8">
                         <div class="space-y-2">
-                            <p class="text-[9px] text-slate-500 font-black uppercase text-center bg-white/5 py-2 px-3">Front of ID</p>
-                            <div class="border border-white/5 overflow-hidden">
-                                <img src="../../uploads/ids/<?= htmlspecialchars($customer['id_image_path']) ?>" class="w-full object-contain max-h-[400px]">
+                            <p class="text-[9px] text-slate-500 font-black uppercase text-center bg-white/5 py-2 px-3">Front of ID (Cloud Source)</p>
+                            <div class="border border-white/5 overflow-hidden bg-black/40">
+                                <img src="<?= htmlspecialchars($customer['id_image_url']) ?>" 
+                                     class="w-full object-contain max-h-[500px]" 
+                                     onerror="this.src='https://via.placeholder.com/800x500?text=Image+Load+Error+Check+Supabase+Permissions'">
+                            </div>
+                            <div class="mt-4 text-center">
+                                <a href="<?= htmlspecialchars($customer['id_image_url']) ?>" target="_blank" class="text-[10px] text-[#00ff41] hover:underline uppercase font-mono">
+                                    View Original High-Res Document
+                                </a>
                             </div>
                         </div>
                     </div>

@@ -13,11 +13,11 @@ if (!$current_user_id) {
     header("Location: ../auth/login.php?error=not_logged_in");
     exit();
 }
-$tenant_schema = $_SESSION['schema_name'] ?? 'public'; 
+$schemaName = $_SESSION['schema_name'] ?? 'public'; 
 
 // 2. FETCH SYSTEM SETTINGS DYNAMICALLY
 try {
-    $stmt = $pdo->prepare("SELECT * FROM " . $tenant_schema . ".tenant_settings WHERE id = 1");
+    $stmt = $pdo->prepare("SELECT * FROM \"{$schemaName}\".tenant_settings WHERE id = 1");
     $stmt->execute();
     $sys_settings = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -36,7 +36,7 @@ $service_fee = $sys_settings['service_fee'] ?? 5.00;
 // 3. FETCH VERIFIED CUSTOMERS
 $customer_data = [];
 try {
-    $stmt = $pdo->query("SELECT customer_id, first_name, last_name, contact_no FROM {$tenant_schema}.customers ORDER BY last_name ASC");
+    $stmt = $pdo->query("SELECT customer_id, first_name, last_name, contact_no FROM \"{$schemaName}\".customers ORDER BY last_name ASC");
     while($c = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $customer_data[$c['customer_id']] = [
             'name'      => $c['first_name'] . ' ' . $c['last_name'],

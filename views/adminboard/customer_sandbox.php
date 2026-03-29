@@ -11,7 +11,10 @@ require_once '../../config/db_connect.php';
 $current_user_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? null;
 if (!$current_user_id) { die("Unauthorized."); }
 
-$tenant_schema = 'tenant_pwn_18e601'; 
+$schemaName = $_SESSION['schema_name'] ?? null;
+if (!$schemaName) {
+    die("Unauthorized: No tenant context.");
+} 
 $msg = '';
 
 // ==============================================================================
@@ -26,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $pdo->beginTransaction();
 
         // 1. Fetch the exact current math for this specific loan
-        $stmt = $pdo->prepare("SELECT principal_amount, interest_rate FROM {$tenant_schema}.loans WHERE loan_id = ?");
+        $stmt = $pdo->prepare("SELECT principal_amount, interest_rate FROM \"{$schemaName}\".loans WHERE loan_id = ?");
         $stmt->execute([$loan_id]);
         $loan_data = $stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -36,13 +39,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $ref_no = 'TEST-SIM-' . rand(1000, 9999);
 
         // 3. Record the Payment
-        $stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.payments (loan_id, amount, payment_type, payment_date, reference_number) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)");
+        $stmt = $pdo->prepare("INSERT INTO \"{$schemaName}\".payments (loan_id, amount, payment_type, payment_date, reference_number) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)");
         $stmt->execute([$loan_id, $amount, $payment_type, $ref_no]);
 
         // 4. Execute Business Logic based on Payment Type
         if ($payment_type === 'interest') {
             // RENEWAL: Pay interest only. Extend due date by 1 month.
-            $pdo->prepare("UPDATE {$tenant_schema}.loans SET due_date = due_date + INTERVAL '1 month' WHERE loan_id = ?")->execute([$loan_id]);
+            $pdo->prepare("UPDATE \"{$schemaName}\".loans SET due_date = due_date + INTERVAL '1 month' WHERE loan_id = ?")->execute([$loan_id]);
             $msg = "Renewal successful: ₱" . number_format($amount, 2) . " interest paid. Due date extended 1 month.";
             
         } elseif ($payment_type === 'principal') {
@@ -53,21 +56,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 throw new Exception("Partial payment must be greater than the interest due (₱" . number_format($current_interest_due, 2) . ").");
             }
 
-            $pdo->prepare("UPDATE {$tenant_schema}.loans SET principal_amount = principal_amount - ?, due_date = due_date + INTERVAL '1 month' WHERE loan_id = ?")
+            $pdo->prepare("UPDATE \"{$schemaName}\".loans SET principal_amount = principal_amount - ?, due_date = due_date + INTERVAL '1 month' WHERE loan_id = ?")
                 ->execute([$principal_reduction, $loan_id]);
                 
             $msg = "Partial successful: ₱" . number_format($current_interest_due, 2) . " covered interest. Principal reduced by ₱" . number_format($principal_reduction, 2) . "!";
             
         } elseif ($payment_type === 'full_redemption') {
             // FULL REDEMPTION: Close the loan.
-            $pdo->prepare("UPDATE {$tenant_schema}.loans SET status = 'redeemed' WHERE loan_id = ?")->execute([$loan_id]);
+            $pdo->prepare("UPDATE \"{$schemaName}\".loans SET status = 'redeemed' WHERE loan_id = ?")->execute([$loan_id]);
             
             // Release the physical item in inventory
-            $item_stmt = $pdo->prepare("SELECT item_id FROM {$tenant_schema}.loans WHERE loan_id = ?");
+            $item_stmt = $pdo->prepare("SELECT item_id FROM \"{$schemaName}\".loans WHERE loan_id = ?");
             $item_stmt->execute([$loan_id]);
             $item_id = $item_stmt->fetchColumn();
             
-            $pdo->prepare("UPDATE {$tenant_schema}.inventory SET item_status = 'redeemed' WHERE item_id = ?")->execute([$item_id]);
+            $pdo->prepare("UPDATE \"{$schemaName}\".inventory SET item_status = 'redeemed' WHERE item_id = ?")->execute([$item_id]);
             $msg = "Full Redemption successful: Ticket closed. Item is ready for release.";
         }
 
@@ -88,7 +91,7 @@ $current_customer_id = $_SESSION['test_customer_id'] ?? null;
 
 // Get all customers for dropdown
 $all_customers = [];
-$stmt = $pdo->query("SELECT customer_id, first_name, last_name FROM {$tenant_schema}.customers ORDER BY last_name ASC");
+$stmt = $pdo->query("SELECT customer_id, first_name, last_name FROM \"{$schemaName}\".customers ORDER BY last_name ASC");
 $all_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $my_profile = null;
@@ -97,15 +100,15 @@ $payment_history = [];
 
 if ($current_customer_id) {
     // Profile
-    $stmt = $pdo->prepare("SELECT * FROM {$tenant_schema}.customers WHERE customer_id = ?");
+    $stmt = $pdo->prepare("SELECT * FROM \"{$schemaName}\".customers WHERE customer_id = ?");
     $stmt->execute([$current_customer_id]);
     $my_profile = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // Active Loans (Only fetch active ones so Redeemed ones disappear from this view)
     $stmt = $pdo->prepare("
         SELECT l.*, i.item_name 
-        FROM {$tenant_schema}.loans l
-        JOIN {$tenant_schema}.inventory i ON l.item_id = i.item_id
+        FROM \"{$schemaName}\".loans l
+        JOIN \"{$schemaName}\".inventory i ON l.item_id = i.item_id
         WHERE l.customer_id = ? AND l.status = 'active'
         ORDER BY l.due_date ASC
     ");
@@ -115,8 +118,8 @@ if ($current_customer_id) {
     // Payments
     $stmt = $pdo->prepare("
         SELECT p.*, l.pawn_ticket_no 
-        FROM {$tenant_schema}.payments p
-        JOIN {$tenant_schema}.loans l ON p.loan_id = l.loan_id
+        FROM \"{$schemaName}\".payments p
+        JOIN \"{$schemaName}\".loans l ON p.loan_id = l.loan_id
         WHERE l.customer_id = ?
         ORDER BY p.payment_date DESC
     ");
