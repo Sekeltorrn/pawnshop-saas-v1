@@ -9,6 +9,10 @@ header("Access-Control-Allow-Methods: POST");
 $customer_id = $_POST['customer_id'] ?? null;
 $tenant_schema = $_POST['tenant_schema'] ?? null;
 
+// Catch the extra ID details from the Android app!
+$id_type = $_POST['id_type'] ?? 'ID';
+$id_number = $_POST['id_number'] ?? 'UNKNOWN';
+
 if (!$customer_id || !$tenant_schema) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized Access. Missing client credentials.']);
     exit;
@@ -80,12 +84,16 @@ if ($uploadResponse['code'] >= 200 && $uploadResponse['code'] < 300) {
     
     // Send the Database Update
     try {
+        // 🔥 FIXED: Using id_image_url, id_type, and id_number to match your schema!
         $stmt = $pdo->prepare("
             UPDATE {$tenant_schema}.customers 
-            SET id_image_path = ?, status = 'pending' 
+            SET id_image_url = ?, 
+                id_type = ?, 
+                id_number = ?, 
+                status = 'pending' 
             WHERE customer_id = ?
         ");
-        $stmt->execute([$final_url, $customer_id]);
+        $stmt->execute([$final_url, $id_type, $id_number, $customer_id]);
 
         echo json_encode([
             'success' => true, 
