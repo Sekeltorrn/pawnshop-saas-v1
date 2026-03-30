@@ -7,9 +7,16 @@ error_reporting(E_ALL);
 session_start();
 require_once '../../config/db_connect.php';
 
-// 1. SECURITY CHECK
+// 1. Pull the schema dynamically from the logged-in tenant's session
+$tenant_schema = $_SESSION['schema_name'] ?? null;
+
+// 2. Safety Check: Stop the page from crashing if the session expired
+if (!$tenant_schema) {
+    die("Critical Error: No tenant schema found. Please log out and log in again.");
+}
+
+// 3. SECURITY CHECK
 $current_user_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? 'DEMO_NODE_01';
-$schemaName = $_SESSION['schema_name'] ?? 'public';
 
 // ==============================================================================
 // 2. FETCH REAL-TIME ANALYTICS FROM DATABASE
@@ -21,27 +28,27 @@ try {
             COALESCE(SUM(principal_amount), 0) as total_capital_out,
             COALESCE(SUM(principal_amount * (interest_rate / 100)), 0) as expected_monthly_interest,
             COUNT(loan_id) as total_active_loans
-        FROM \"{$schemaName}\".loans 
+        FROM \"{$tenant_schema}\".loans 
         WHERE status = 'active'
     ");
     $stmt->execute();
     $financials = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // B. Vault Capacity (Items currently secured)
-    $stmt = $pdo->prepare("SELECT COUNT(item_id) as vaulted_items FROM \"{$schemaName}\".inventory WHERE item_status = 'in_vault'");
+    $stmt = $pdo->prepare("SELECT COUNT(item_id) as vaulted_items FROM \"{$tenant_schema}\".inventory WHERE item_status = 'in_vault'");
     $stmt->execute();
     $vault = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // C. Action Alerts (Pending Customers)
-    $stmt = $pdo->prepare("SELECT COUNT(customer_id) as pending_kyc FROM \"{$schemaName}\".customers WHERE status = 'pending'");
+    $stmt = $pdo->prepare("SELECT COUNT(customer_id) as pending_kyc FROM \"{$tenant_schema}\".customers WHERE status = 'pending'");
     $stmt->execute();
     $alerts = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // D. Maturing Soon (Tickets expiring in the next 7 days)
     $stmt = $pdo->prepare("
         SELECT l.pawn_ticket_no, l.due_date, l.principal_amount, c.first_name, c.last_name 
-        FROM " . $tenant_schema . ".loans l
-        JOIN " . $tenant_schema . ".customers c ON l.customer_id = c.customer_id
+        FROM \"{$tenant_schema}\".loans l
+        JOIN \"{$tenant_schema}\".customers c ON l.customer_id = c.customer_id
         WHERE l.status = 'active' AND l.due_date <= CURRENT_DATE + INTERVAL '7 days'
         ORDER BY l.due_date ASC LIMIT 5
     ");
@@ -51,9 +58,9 @@ try {
     // E. Recent Cashflow (Last 5 Payments)
     $stmt = $pdo->prepare("
         SELECT p.amount, p.payment_date, p.payment_type, l.pawn_ticket_no, c.first_name, c.last_name
-        FROM " . $tenant_schema . ".payments p
-        LEFT JOIN " . $tenant_schema . ".loans l ON p.loan_id = l.loan_id
-        LEFT JOIN " . $tenant_schema . ".customers c ON l.customer_id = c.customer_id
+        FROM \"{$tenant_schema}\".payments p
+        LEFT JOIN \"{$tenant_schema}\".loans l ON p.loan_id = l.loan_id
+        LEFT JOIN \"{$tenant_schema}\".customers c ON l.customer_id = c.customer_id
         ORDER BY p.payment_date DESC LIMIT 5
     ");
     $stmt->execute();

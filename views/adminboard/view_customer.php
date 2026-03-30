@@ -220,44 +220,21 @@ include '../../includes/header.php';
         <!-- RIGHT COLUMN: OCR Scanner & Documents -->
         <div class="lg:col-span-7 space-y-6">
             <!-- OCR Scanner Section (Only for Pending) -->
-            <?php if($customer['status'] === 'pending'): ?>
+            <?php if($customer['status'] === 'pending' && !empty($customer['id_image_url'])): ?>
             <div class="bg-[#141518] border border-white/5 p-8">
                 <h3 class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
                     <span class="material-symbols-outlined text-sm">qr_code_scanner</span>
                     OCR ID Scanner
                 </h3>
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3 flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-                            Upload ID Image
-                        </label>
-                        
-                        <input type="file" id="ocr_id_upload" accept="image/*" class="w-full text-xs text-slate-500 file:bg-[#ff6b00] file:text-black file:border-0 file:px-4 file:py-2 file:mr-4 file:rounded file:font-bold file:uppercase file:cursor-pointer mb-4 cursor-pointer">
-                        
-                        <p id="ocr_scan_status" class="text-[10px] text-slate-500 font-mono uppercase tracking-widest mb-4 hidden"><span class="animate-pulse text-amber-500">Initializing AI Engine...</span></p>
-
-                        <div id="ocr_image_container" class="relative w-full border border-white/10 bg-[#0a0b0d] overflow-hidden hidden max-h-96">
-                            <img id="ocr_scanned_image" class="w-full h-auto block" alt="ID Scan">
-                            <div id="ocr_overlay_container" class="absolute inset-0 pointer-events-none"></div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3">Select Target Field</label>
-                        <p class="text-[10px] text-slate-400 mb-4 font-mono">Click a highlighted text box on the image to extract.</p>
-                        
-                        <div class="space-y-2">
-                            <select id="ocr_active_input_target" class="w-full bg-[#0a0b0d] border border-[#00ff41]/30 p-3 text-[#00ff41] text-xs font-mono outline-none focus:border-[#00ff41]/50 transition-colors">
-                                <option value="input_first">First Name</option>
-                                <option value="input_middle">Middle Name</option>
-                                <option value="input_last">Last Name</option>
-                                <option value="input_id_no">ID Number</option>
-                            </select>
-                        </div>
-                    </div>
+                <p class="text-[9px] text-slate-400 mb-6 font-mono uppercase tracking-widest">Auto-scanning submitted ID document. Click any text to copy to clipboard.</p>
+                
+                <div id="ocr_image_container" class="relative w-full border border-white/10 bg-[#0a0b0d] overflow-hidden max-h-96">
+                    <img id="ocr_scanned_image" src="<?= htmlspecialchars($customer['id_image_url']) ?>" class="w-full h-auto block" alt="ID Scan" onerror="this.src='https://via.placeholder.com/800x500?text=Image+Load+Error'">
+                    <div id="ocr_overlay_container" class="absolute inset-0 pointer-events-none"></div>
                 </div>
+                
+                <p id="ocr_scan_status" class="text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-4"><span class="animate-pulse text-amber-500">Initializing AI Engine...</span></p>
             </div>
             <?php endif; ?>
 
@@ -332,44 +309,98 @@ include '../../includes/header.php';
         box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
         z-index: 10;
     }
+    
+    .copy-toast {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #00ff41;
+        color: #0a0b0d;
+        padding: 12px 24px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 12px;
+        z-index: 100;
+        animation: slideInUp 0.3s ease-out, slideOutDown 0.3s ease-out 2.7s forwards;
+    }
+    
+    @keyframes slideInUp {
+        from {
+            transform: translateY(100px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideOutDown {
+        from {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateY(100px);
+            opacity: 0;
+        }
+    }
 </style>
 
 <script>
-    const ocrFileInput = document.getElementById('ocr_id_upload');
     const ocrImageElement = document.getElementById('ocr_scanned_image');
-    const ocrImageContainer = document.getElementById('ocr_image_container');
     const ocrOverlayContainer = document.getElementById('ocr_overlay_container');
     const ocrStatusText = document.getElementById('ocr_scan_status');
 
-    if (ocrFileInput) {
-        ocrFileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+    // Auto-run OCR on page load if image exists
+    if (ocrImageElement && ocrImageElement.src && ocrImageElement.src.includes('supabase')) {
+        if (ocrImageElement.complete) {
+            runOCR(ocrImageElement);
+        } else {
+            ocrImageElement.onload = () => {
+                runOCR(ocrImageElement);
+            };
+        }
+    }
 
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                ocrImageElement.src = event.target.result;
-                ocrImageContainer.classList.remove('hidden');
-                ocrOverlayContainer.innerHTML = '';
-                
-                ocrImageElement.onload = () => {
-                    runOCR(ocrImageElement);
-                };
-            }
-            reader.readAsDataURL(file);
+    function showCopyToast() {
+        const toast = document.createElement('div');
+        toast.className = 'copy-toast';
+        toast.textContent = 'Copied to Clipboard!';
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showCopyToast();
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+            alert('Copy failed. Text: ' + text);
         });
     }
 
     function runOCR(imgEl) {
-        ocrStatusText.classList.remove('hidden');
-        ocrStatusText.innerHTML = '<span class="animate-pulse text-amber-500">Scanning Document Matrix... Please wait.</span>';
+        ocrStatusText.textContent = '';
+        const statusSpan = document.createElement('span');
+        statusSpan.className = 'animate-pulse text-amber-500';
+        statusSpan.textContent = 'Scanning Document Matrix... Please wait.';
+        ocrStatusText.appendChild(statusSpan);
 
         Tesseract.recognize(
             imgEl.src,
             'eng',
             { logger: m => console.log(m) }
         ).then(({ data: { words } }) => {
-            ocrStatusText.innerHTML = '<span class="text-[#00ff41]">Scan Complete. Click highlighted text to extract.</span>';
+            ocrStatusText.textContent = '';
+            const completeSpan = document.createElement('span');
+            completeSpan.className = 'text-[#00ff41]';
+            completeSpan.textContent = 'Scan Complete. Click highlighted text to copy to clipboard.';
+            ocrStatusText.appendChild(completeSpan);
+            
             ocrOverlayContainer.style.pointerEvents = 'auto';
 
             const scaleX = imgEl.clientWidth / imgEl.naturalWidth;
@@ -393,31 +424,19 @@ include '../../includes/header.php';
                 box.dataset.text = word.text;
 
                 box.onclick = function() {
-                    const targetId = document.getElementById('ocr_active_input_target').value;
-                    let fieldName = '';
-                    
-                    if (targetId === 'input_first') fieldName = 'first_name';
-                    else if (targetId === 'input_middle') fieldName = 'middle_name';
-                    else if (targetId === 'input_last') fieldName = 'last_name';
-                    else if (targetId === 'input_id_no') fieldName = 'valid_id_num';
-                    
-                    const inputField = document.querySelector('input[name="' + fieldName + '"]');
-                    
-                    if (inputField) {
-                        if (inputField.value.trim() !== "") {
-                            inputField.value += " " + this.dataset.text;
-                        } else {
-                            inputField.value = this.dataset.text;
-                        }
-                        this.style.backgroundColor = 'rgba(255, 107, 0, 0.5)';
-                        setTimeout(() => { this.style.backgroundColor = 'rgba(0, 255, 65, 0.1)'; }, 300);
-                    }
+                    copyToClipboard(this.dataset.text);
+                    this.style.backgroundColor = 'rgba(255, 107, 0, 0.5)';
+                    setTimeout(() => { this.style.backgroundColor = 'rgba(0, 255, 65, 0.1)'; }, 300);
                 };
 
                 ocrOverlayContainer.appendChild(box);
             });
         }).catch(err => {
-            ocrStatusText.innerHTML = '<span class="text-red-500">Scan Failed: ' + err.message + '</span>';
+            ocrStatusText.textContent = '';
+            const errorSpan = document.createElement('span');
+            errorSpan.className = 'text-red-500';
+            errorSpan.textContent = 'Scan Failed: ' + err.message;
+            ocrStatusText.appendChild(errorSpan);
         });
     }
 </script>
