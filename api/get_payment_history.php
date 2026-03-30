@@ -23,7 +23,12 @@ if (!$customer_id || !$shop_code) {
 }
 
 // Dynamic Schema Setup
-$tenant_schema = 'tenant_' . strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code));
+$sanitized = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code));
+if (strpos($sanitized, 'tenant_') === 0) {
+    $tenant_schema = $sanitized;
+} else {
+    $tenant_schema = 'tenant_' . $sanitized;
+}
 
 try {
     // Set Search Path to target the tenant schema specifically
@@ -72,7 +77,7 @@ try {
     $errorMsg = $e->getMessage();
     // Error Handling: check for schema missing (usually "schema does not exist" or "relation does not exist")
     if (strpos($errorMsg, 'does not exist') !== false) {
-        $response['message'] = 'Tenant Configuration Error: Shop Code is invalid or does not exist.';
+        $response['message'] = 'Invalid Shop Configuration';
     } else {
         $response['message'] = 'System Error: ' . $errorMsg;
     }
