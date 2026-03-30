@@ -14,6 +14,13 @@ $response = [
 
 $customer_id = $_GET['customer_id'] ?? null;
 $shop_code = $_GET['shop_code'] ?? null; // 🔴 NEW: The app must tell us which shop to look at!
+$status = $_GET['status'] ?? 'active'; // 🆕 Optional: Filter by ticket status (active, renewed, redeemed, expired)
+
+// Validate status parameter to prevent SQL injection
+$valid_statuses = ['active', 'renewed', 'redeemed', 'expired', 'past_due'];
+if (!in_array($status, $valid_statuses)) {
+    $status = 'active'; // Default to active if invalid
+}
 
 if (!$customer_id || !$shop_code) {
     $response['message'] = 'Access Denied: Missing Client ID or Shop Code';
@@ -40,11 +47,11 @@ try {
             i.item_name
         FROM \"{$tenant_schema}\".loans l
         LEFT JOIN \"{$tenant_schema}\".inventory i ON l.item_id = i.item_id
-        WHERE l.customer_id = ? AND l.status = 'active'
+        WHERE l.customer_id = ? AND l.status = ?
         ORDER BY l.created_at DESC
     ");
     
-    $stmt->execute([$customer_id]);
+    $stmt->execute([$customer_id, $status]);
     $loans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $formatted_tickets = [];
@@ -62,7 +69,8 @@ try {
 
     $response['success'] = true;
     $response['tickets'] = $formatted_tickets;
-    $response['message'] = count($formatted_tickets) > 0 ? 'Vault data synchronized.' : 'No active tickets.';
+    $status_label = ucfirst($status);
+    $response['message'] = count($formatted_tickets) > 0 ? "$status_label tickets synchronized." : "No $status tickets found.";
 
 } catch (PDOException $e) {
     // This will force the API to spit out the raw, exact database error!
