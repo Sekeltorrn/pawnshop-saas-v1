@@ -48,7 +48,7 @@ try {
             $lname = $_POST['last_name'] ?? '';
             $email = $_POST['email'] ?? '';
             $contact = $_POST['contact_no'] ?? '';
-            $birthday = $_POST['birthday'] ?? '';
+            $birthday = !empty($_POST['birthday']) ? $_POST['birthday'] : null;
             $address = $_POST['address'] ?? '';
             $id_type = $_POST['id_type'] ?? '';
             $id_num = $_POST['id_number'] ?? '';
@@ -67,7 +67,7 @@ try {
             $lname = $_POST['last_name'] ?? '';
             $email = $_POST['email'] ?? '';
             $contact = $_POST['contact_no'] ?? '';
-            $birthday = $_POST['birthday'] ?? '';
+            $birthday = !empty($_POST['birthday']) ? $_POST['birthday'] : null;
             $address = $_POST['address'] ?? '';
             $id_type = $_POST['id_type'] ?? '';
             $id_num = $_POST['id_number'] ?? '';

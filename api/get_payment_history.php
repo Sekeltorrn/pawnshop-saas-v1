@@ -22,30 +22,25 @@ if (!$customer_id || !$shop_code) {
     exit;
 }
 
-// Convert shop_code to tenant_schema (same pattern as get_my_tickets.php)
-$sanitized_code = preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code);
-if (strpos($sanitized_code, 'tenant_pwn_') === 0) {
-    $tenant_schema = strtolower($sanitized_code);
-} else {
-    $tenant_schema = 'tenant_pwn_' . strtolower($sanitized_code);
-}
+// Dynamic Schema Setup
+$tenant_schema = 'tenant_' . strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code));
 
 try {
-    // Query payment history joined with loans to get ticket numbers
+    // Set Search Path to target the tenant schema specifically
+    $pdo->exec("SET search_path TO \"$tenant_schema\", public;");
+
+    // The Query: Perform a JOIN between payments and loans on loan_id
     $stmt = $pdo->prepare("
         SELECT 
-            p.payment_id,
-            p.pawn_ticket_no,
-            p.amount,
-            p.payment_date,
-            p.payment_type,
-            p.payment_method,
-            l.principal_amount,
-            l.status as loan_status
-        FROM \"{$tenant_schema}\".payments p
-        JOIN \"{$tenant_schema}\".loans l ON p.pawn_ticket_no = l.pawn_ticket_no
-        WHERE l.customer_id = ?
-        ORDER BY p.payment_date DESC
+            loans.pawn_ticket_no,
+            payments.amount,
+            payments.payment_date,
+            payments.payment_type,
+            payments.payment_id
+        FROM payments
+        JOIN loans ON payments.loan_id = loans.loan_id
+        WHERE loans.customer_id = ?
+        ORDER BY payments.payment_date DESC
     ");
     
     $stmt->execute([$customer_id]);
@@ -56,13 +51,14 @@ try {
     foreach ($payments as $payment) {
         $formatted_history[] = [
             'payment_id' => $payment['payment_id'],
-            'pawn_ticket_no' => (int) $payment['pawn_ticket_no'],
+            'pawn_ticket_no' => (string) $payment['pawn_ticket_no'],
             'amount' => (float) $payment['amount'],
             'payment_date' => $payment['payment_date'],
             'payment_type' => $payment['payment_type'],
-            'payment_method' => $payment['payment_method'] ?? 'Unknown',
-            'principal_amount' => (float) $payment['principal_amount'],
-            'loan_status' => $payment['loan_status']
+            // Fallbacks for optional fields that were in previous query response but omitted in the new schema definition
+            'payment_method' => 'Unknown',
+            'principal_amount' => 0.0,
+            'loan_status' => 'Unknown'
         ];
     }
 
@@ -73,7 +69,13 @@ try {
         : 'No payment history found.';
 
 } catch (PDOException $e) {
-    $response['message'] = 'System Error: ' . $e->getMessage();
+    $errorMsg = $e->getMessage();
+    // Error Handling: check for schema missing (usually "schema does not exist" or "relation does not exist")
+    if (strpos($errorMsg, 'does not exist') !== false) {
+        $response['message'] = 'Tenant Configuration Error: Shop Code is invalid or does not exist.';
+    } else {
+        $response['message'] = 'System Error: ' . $errorMsg;
+    }
 }
 
 echo json_encode($response);
