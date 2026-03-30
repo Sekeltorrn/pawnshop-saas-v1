@@ -92,7 +92,7 @@ if ($http_code == 200 && isset($result['access_token'])) {
             
             // SQL ADJUSTED TO YOUR SCHEMA: auth_user_id, contact_no, password
             $stmt = $pdo->prepare("INSERT INTO customers (auth_user_id, first_name, last_name, email, contact_no, password, is_walk_in, status) 
-                                   VALUES (:auth_id, :fname, :lname, :email, :phone, :pass, FALSE, 'pending')");
+                                   VALUES (:auth_id, :fname, :lname, :email, :phone, :pass, FALSE, 'verified')");
             
             $stmt->execute([
                 ':auth_id' => $user_id,
@@ -105,7 +105,7 @@ if ($http_code == 200 && isset($result['access_token'])) {
 
             echo json_encode([
                 "status" => "success",
-                "message" => "Registration successful! Wait for admin approval."
+                "message" => "Registration verified! You can now log in."
             ]);
 
         } catch (PDOException $e) {

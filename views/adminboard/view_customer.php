@@ -229,7 +229,7 @@ include '../../includes/header.php';
                 
                 <p class="text-[9px] text-slate-400 mb-6 font-mono uppercase tracking-widest">Auto-scanning submitted ID document. Click any text to copy to clipboard.</p>
                 
-                <div id="ocr_image_container" class="relative w-full border border-white/10 bg-[#0a0b0d] overflow-hidden max-h-96">
+                <div id="ocr_image_container" class="relative w-full border border-white/10 bg-[#0a0b0d]">
                     <img id="ocr_scanned_image" src="<?= htmlspecialchars($customer['id_image_url']) ?>" class="w-full h-auto block" alt="ID Scan" onerror="this.src='https://via.placeholder.com/800x500?text=Image+Load+Error'">
                     <div id="ocr_overlay_container" class="absolute inset-0 pointer-events-none"></div>
                 </div>
@@ -239,33 +239,7 @@ include '../../includes/header.php';
             <?php endif; ?>
 
             <!-- Documents Section -->
-            <div class="bg-[#141518] border border-white/5 p-8">
-                <h3 class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-6">Submitted Documents</h3>
-                
-                <?php if(!empty($customer['id_image_url'])): ?>
-                    <div class="space-y-8">
-                        <div class="space-y-2">
-                            <p class="text-[9px] text-slate-500 font-black uppercase text-center bg-white/5 py-2 px-3">Front of ID (Cloud Source)</p>
-                            <div class="border border-white/5 overflow-hidden bg-black/40">
-                                <img src="<?= htmlspecialchars($customer['id_image_url']) ?>" 
-                                     class="w-full object-contain max-h-[500px]" 
-                                     onerror="this.src='https://via.placeholder.com/800x500?text=Image+Load+Error+Check+Supabase+Permissions'">
-                            </div>
-                            <div class="mt-4 text-center">
-                                <a href="<?= htmlspecialchars($customer['id_image_url']) ?>" target="_blank" class="text-[10px] text-[#00ff41] hover:underline uppercase font-mono">
-                                    View Original High-Res Document
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                <?php else: ?>
-                    <div class="h-96 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-white/5">
-                        <span class="material-symbols-outlined text-5xl mb-4">folder_off</span>
-                        <p class="text-xs uppercase tracking-widest font-black">No Documents Uploaded</p>
-                        <p class="text-[10px] text-slate-600 mt-2">The customer has not submitted ID yet.</p>
-                    </div>
-                <?php endif; ?>
-            </div>
+            
         </div>
 
         <!-- Rejection Modal -->
@@ -374,13 +348,36 @@ include '../../includes/header.php';
         }, 3000);
     }
 
-    function copyToClipboard(text) {
-        navigator.clipboard.writeText(text).then(() => {
-            showCopyToast();
-        }).catch(err => {
-            console.error('Failed to copy:', err);
-            alert('Copy failed. Text: ' + text);
-        });
+    function fallbackCopyTextToClipboard(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+            document.execCommand('copy');
+            return true;
+        } catch (err) {
+            console.error('Fallback copy failed:', err);
+            return false;
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
+
+    function copyTextToClipboard(text) {
+        if (!navigator.clipboard) {
+            return fallbackCopyTextToClipboard(text);
+        }
+        
+        navigator.clipboard.writeText(text)
+            .then(() => true)
+            .catch(err => {
+                console.error('Modern clipboard API failed, using fallback:', err);
+                return fallbackCopyTextToClipboard(text);
+            });
     }
 
     function runOCR(imgEl) {
@@ -424,9 +421,36 @@ include '../../includes/header.php';
                 box.dataset.text = word.text;
 
                 box.onclick = function() {
-                    copyToClipboard(this.dataset.text);
-                    this.style.backgroundColor = 'rgba(255, 107, 0, 0.5)';
-                    setTimeout(() => { this.style.backgroundColor = 'rgba(0, 255, 65, 0.1)'; }, 300);
+                    // Call the hybrid clipboard function
+                    copyTextToClipboard(this.dataset.text);
+                    
+                    // Highlight the box with bright green
+                    const originalBg = this.style.backgroundColor;
+                    this.style.backgroundColor = 'rgba(0, 255, 65, 0.8)';
+                    this.style.zIndex = '20';
+                    
+                    // Create and display "Copied!" feedback inside the box
+                    const copiedSpan = document.createElement('span');
+                    copiedSpan.textContent = 'Copied!';
+                    copiedSpan.style.position = 'absolute';
+                    copiedSpan.style.top = '50%';
+                    copiedSpan.style.left = '50%';
+                    copiedSpan.style.transform = 'translate(-50%, -50%)';
+                    copiedSpan.style.color = 'white';
+                    copiedSpan.style.fontWeight = 'bold';
+                    copiedSpan.style.fontSize = '12px';
+                    copiedSpan.style.whiteSpace = 'nowrap';
+                    copiedSpan.style.textShadow = '0 2px 8px rgba(0, 0, 0, 0.8)';
+                    copiedSpan.style.zIndex = '30';
+                    
+                    this.appendChild(copiedSpan);
+                    
+                    // Revert visual feedback after 800ms
+                    setTimeout(() => {
+                        copiedSpan.remove();
+                        this.style.backgroundColor = 'rgba(0, 255, 65, 0.1)';
+                        this.style.zIndex = '10';
+                    }, 800);
                 };
 
                 ocrOverlayContainer.appendChild(box);
