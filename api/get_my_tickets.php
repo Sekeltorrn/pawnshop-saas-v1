@@ -46,8 +46,6 @@ try {
             loans.principal_amount, 
             loans.due_date, 
             loans.status,
-            loans.maturity_date,
-            loans.expiration_date,
             inventory.item_name
         FROM loans
         LEFT JOIN inventory ON loans.item_id = inventory.item_id
@@ -65,8 +63,8 @@ try {
             'principal_amount' => (float) $loan['principal_amount'],
             'due_date' => $loan['due_date'],
             'status' => $loan['status'],
-            'maturity_date' => $loan['maturity_date'] ?? null,
-            'expiration_date' => $loan['expiration_date'] ?? null,
+            'maturity_date' => null,
+            'expiration_date' => null,
             'inventory' => [
                 'item_name' => $loan['item_name'] ?? 'Vault Item'
             ]
