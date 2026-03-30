@@ -30,6 +30,9 @@ function createPaymongoCheckout($amount, $description, $reference_number, $custo
     $amount_in_centavos = intval(round($amount * 100));
 
     // 3. BUILD THE PAYLOAD
+    // Determine the base URL for redirects (production domain or local .test)
+    $base_url = getenv('APP_URL') ?: 'http://pawnshop-saas-v1.test';
+    
     $payload = [
         'data' => [
             'attributes' => [
@@ -52,7 +55,9 @@ function createPaymongoCheckout($amount, $description, $reference_number, $custo
                     'card', 
                     'qrph'
                 ],
-                'reference_number' => $reference_number
+                'reference_number' => $reference_number,
+                'success_url' => $base_url . '/api/payment_success.php?reference=' . urlencode($reference_number),
+                'cancel_url' => $base_url . '/api/payment_cancel.php?reference=' . urlencode($reference_number)
             ]
         ]
     ];
