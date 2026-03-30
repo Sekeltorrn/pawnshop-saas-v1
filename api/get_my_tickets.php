@@ -29,26 +29,30 @@ if (!$customer_id || !$shop_code) {
 }
 
 // 🟢 NEW SMART PREFIX CHECK
-$sanitized_code = preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code);
-// If the phone already sent the 'tenant_pwn_' part, just use it. If not, add it!
-if (strpos($sanitized_code, 'tenant_pwn_') === 0) {
-    $tenant_schema = strtolower($sanitized_code);
+$sanitized = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code));
+if (strpos($sanitized, 'tenant_') === 0) {
+    $tenant_schema = $sanitized;
 } else {
-    $tenant_schema = 'tenant_pwn_' . strtolower($sanitized_code);
+    $tenant_schema = 'tenant_' . $sanitized;
 }
 
 try {
+    // Set Search Path to target the tenant schema specifically
+    $pdo->exec("SET search_path TO \"$tenant_schema\", public;");
+
     $stmt = $pdo->prepare("
         SELECT 
-            l.pawn_ticket_no, 
-            l.principal_amount, 
-            l.due_date, 
-            l.status,
-            i.item_name
-        FROM \"{$tenant_schema}\".loans l
-        LEFT JOIN \"{$tenant_schema}\".inventory i ON l.item_id = i.item_id
-        WHERE l.customer_id = ? AND l.status = ?
-        ORDER BY l.created_at DESC
+            loans.pawn_ticket_no, 
+            loans.principal_amount, 
+            loans.due_date, 
+            loans.status,
+            loans.maturity_date,
+            loans.expiration_date,
+            inventory.item_name
+        FROM loans
+        LEFT JOIN inventory ON loans.item_id = inventory.item_id
+        WHERE loans.customer_id = ? AND loans.status = ?
+        ORDER BY loans.due_date ASC
     ");
     
     $stmt->execute([$customer_id, $status]);
@@ -61,6 +65,8 @@ try {
             'principal_amount' => (float) $loan['principal_amount'],
             'due_date' => $loan['due_date'],
             'status' => $loan['status'],
+            'maturity_date' => $loan['maturity_date'] ?? null,
+            'expiration_date' => $loan['expiration_date'] ?? null,
             'inventory' => [
                 'item_name' => $loan['item_name'] ?? 'Vault Item'
             ]
