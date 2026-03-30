@@ -51,7 +51,7 @@ try {
             inventory.item_name
         FROM loans
         LEFT JOIN inventory ON loans.item_id = inventory.item_id
-        WHERE loans.customer_id = ? AND loans.status = ?
+        WHERE loans.customer_id::text = ? AND LOWER(loans.status) = LOWER(?)
         ORDER BY loans.due_date ASC
     ");
     
@@ -83,5 +83,6 @@ try {
     $response['message'] = 'System Error: ' . $e->getMessage();
 }
 
+error_log("GET_MY_TICKETS_OUTPUT: " . json_encode($response));
 echo json_encode($response);
 ?>
