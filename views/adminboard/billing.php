@@ -50,7 +50,7 @@ try {
 $error_msg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'pay_subscription') {
     
-    $amount = 1500.00; // ₱1,500/month SaaS fee
+    $amount = 1500.00; // â‚±1,500/month SaaS fee
     $description = "Pawnereno Pro - 30 Day License";
     
     // Add a timestamp so the reference is ALWAYS unique for PayMongo
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 }
 
 $pageTitle = 'SaaS Billing & License';
-include '../../includes/header.php';
+include 'includes/header.php';
 ?>
 
 <div class="max-w-4xl mx-auto w-full px-4 pb-12 mt-12 h-[calc(100vh-100px)]">
@@ -108,10 +108,10 @@ include '../../includes/header.php';
                     <span class="material-symbols-outlined text-purple-500 text-3xl">verified</span>
                     <h2 class="text-2xl font-black text-white uppercase tracking-wider">Pawnereno Pro</h2>
                 </div>
-                <p class="text-slate-400 text-sm font-mono">Unlimited Tickets • Live Analytics • PayMongo Integration</p>
+                <p class="text-slate-400 text-sm font-mono">Unlimited Tickets â€¢ Live Analytics â€¢ PayMongo Integration</p>
             </div>
             <div class="text-right">
-                <p class="text-4xl font-black text-white font-display tracking-tighter">₱1,500<span class="text-lg text-slate-500">.00</span></p>
+                <p class="text-4xl font-black text-white font-display tracking-tighter">â‚±1,500<span class="text-lg text-slate-500">.00</span></p>
                 <p class="text-[10px] text-purple-400 font-bold uppercase tracking-[0.2em] mt-1">Per 30-Day Cycle</p>
             </div>
         </div>
@@ -156,4 +156,4 @@ include '../../includes/header.php';
     </div>
 </div>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

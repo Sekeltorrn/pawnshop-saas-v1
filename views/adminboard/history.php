@@ -78,7 +78,7 @@ function buildFilterUrl($filter_val) {
 }
 
 $pageTitle = 'Financial Ledger';
-include '../../includes/header.php';
+include 'includes/header.php';
 ?>
 
 <div class="max-w-7xl mx-auto w-full px-4 pb-12 mt-6 h-[calc(100vh-100px)] flex flex-col">
@@ -205,7 +205,7 @@ include '../../includes/header.php';
 
                         <div class="col-span-2 text-right flex flex-col justify-center">
                             <span class="text-white font-black font-mono text-lg tracking-tight group-hover:text-[#00ff41] transition-colors">
-                                ₱<?= number_format($t['amount'], 2) ?>
+                                â‚±<?= number_format($t['amount'], 2) ?>
                             </span>
                         </div>
                     </div>
@@ -219,4 +219,4 @@ include '../../includes/header.php';
     </div>
 </div>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

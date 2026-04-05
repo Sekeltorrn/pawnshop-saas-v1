@@ -9,7 +9,6 @@ require_once __DIR__ . '/../../config/supabase.php';
 require_once __DIR__ . '/../../config/db_connect.php'; 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $rememberMe = isset($_POST['remember']) ? true : false;
@@ -20,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     try {
-        // 1. THE SUPER ADMIN BOUNCER (Maintenance Mode Check)
+        // Maintenance Mode Check
         $maint_stmt = $pdo->query("SELECT setting_value FROM public.platform_settings WHERE setting_key = 'maintenance_mode'");
         $maintenance = $maint_stmt->fetchColumn();
         
@@ -29,22 +28,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        // 2. Authenticate the user with Supabase API
+        // STEP 1: Attempt Admin Authentication (Supabase)
         $supabase = new Supabase();
         $result = $supabase->signIn($email, $password);
 
         if (isset($result['code']) && $result['code'] === 200) {
-            
+            // ADMIN SUCCESSFUL
             $user_id = $result['body']['user']['id'];
 
-            // 3. Remember Me Cookie Logic
-            if ($rememberMe) {
-                setcookie('pawnereno_email', $email, time() + (86400 * 30), "/"); 
-            } else {
-                setcookie('pawnereno_email', '', time() - 3600, "/"); 
-            }
-
-            // 4. THE TRAFFIC COP: Pull their master profile data
+            // Fetch business profile for metadata
             $stmt = $pdo->prepare("SELECT business_name, shop_slug, payment_status, schema_name, shop_code, last_verified_at FROM public.profiles WHERE id = ?");
             $stmt->execute([$user_id]);
             $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -57,55 +49,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['payment_status'] = $tenant['payment_status'];
                 $_SESSION['schema_name'] = $tenant['schema_name']; 
                 $_SESSION['shop_code'] = $tenant['shop_code'];
+                $_SESSION['role_name'] = 'Admin';
                 $_SESSION['is_logged_in'] = true;
 
-                // 5A. Check Suspended Status First (Kick them out immediately)
-                if ($tenant['payment_status'] === 'suspended') {
-                    session_destroy();
-                    header("Location: ../../views/auth/login.php?error=" . urlencode("ACCESS DENIED: Account suspended. Please resolve billing."));
-                    exit;
-                } 
+                // Handle Remember Me
+                if ($rememberMe) {
+                    setcookie('pawnereno_email', $email, time() + (86400 * 30), "/"); 
+                }
 
-                // --- 5B. THE 7-DAY BANK-LEVEL CHECK (Now applies to everyone!) ---
+                // CHECK OTP BYPASS (7-Day Timer)
                 $lastVerified = strtotime($tenant['last_verified_at'] ?? '2000-01-01');
                 $sevenDaysAgo = strtotime('-7 days');
 
-                if ($lastVerified < $sevenDaysAgo) {
-                    // It has been more than 7 days! Send a new OTP to their email.
-                    $supabase->sendLoginOtp($email);
-                    
-                    // Flag them as pending so they can't bypass the OTP screen
-                    $_SESSION['pending_login_verification'] = true;
-                    
-                    // Reroute them to the OTP frontend
-                    header("Location: ../../views/auth/login_otp.php");
-                    exit;
+                if ($lastVerified >= $sevenDaysAgo) {
+                    // OTP BYPASS LOGIC: Where do they belong?
+                    $isUnpaid = ($tenant['payment_status'] === 'unpaid');
+                    $isMissingSlug = empty($tenant['shop_slug']);
+
+                    if ($isUnpaid || $isMissingSlug) {
+                        header("Location: ../../views/paywall/paywall_view.php");
+                        exit;
+                    } else {
+                        header("Location: ../../views/adminboard/dashboard.php");
+                        exit;
+                    }
                 }
 
-                // --- 5C. THE ROUTER: If they survived the 7-day check, where do they go? ---
-                if ($tenant['payment_status'] === 'unpaid' || empty($tenant['shop_slug'])) {
-                    header("Location: ../../views/paywall/paywall_view.php");
-                    exit;
-                } 
-
-                // Everything is active, paid, and within the 7-day window. Go to dashboard!
-                header("Location: ../../views/adminboard/dashboard.php");
+                // Trigger 2FA OTP for Admin
+                $supabase->sendLoginOtp($email);
+                $_SESSION['pending_login_verification'] = true;
+                
+                header("Location: ../../views/auth/login_otp.php");
                 exit;
-
             } else {
-                header("Location: ../../views/auth/login.php?error=" . urlencode("Account setup incomplete. Profile missing."));
+                header("Location: ../../views/auth/login.php?error=" . urlencode("Admin profile record not found."));
                 exit;
             }
-
-        } else {
-            // FAILED LOGIN
-            $errorMsg = $result['body']['error_description'] ?? $result['body']['msg'] ?? 'Invalid login credentials.';
-            if (strpos(strtolower($errorMsg), 'email not confirmed') !== false) {
-                $errorMsg = "Please verify your email address before logging in.";
-            }
-            header("Location: ../../views/auth/login.php?error=" . urlencode($errorMsg));
-            exit;
         }
+
+        // STEP 2: Try Staff Authentication (Dynamic Cross-Schema Lookup)
+        // If Supabase failed, we proceed here.
+        $stmt_schemas = $pdo->query("SELECT schema_name FROM public.profiles WHERE schema_name IS NOT NULL");
+        $all_schemas = $stmt_schemas->fetchAll(PDO::FETCH_COLUMN);
+
+        foreach ($all_schemas as $schema) {
+            // Safely query the employees table in the current schema
+            $query = "SELECT * FROM \"$schema\".employees WHERE email = :email AND status = 'active' LIMIT 1";
+            $stmt_emp = $pdo->prepare($query);
+            $stmt_emp->execute(['email' => $email]);
+            $employee = $stmt_emp->fetch(PDO::FETCH_ASSOC);
+
+            if ($employee && password_verify($password, $employee['password_hash'])) {
+                // STAFF SUCCESSFUL
+                $_SESSION['employee_id'] = $employee['employee_id'];
+                $_SESSION['user_id'] = $employee['employee_id']; // Consistency with auth checks
+                $_SESSION['email'] = $employee['email'];
+                $_SESSION['role_name'] = 'Staff';
+                $_SESSION['schema_name'] = $schema;
+                $_SESSION['is_logged_in'] = true;
+
+                // Get shop name if possible for session (optional but nice)
+                $stmt_shop = $pdo->prepare("SELECT shop_name FROM \"$schema\".tenant_settings LIMIT 1");
+                $stmt_shop->execute();
+                $_SESSION['business_name'] = $stmt_shop->fetchColumn() ?: 'Staff Dashboard';
+
+                // STAFF BYPASSES OTP
+                header("Location: ../../views/boardstaff/dashboard.php");
+                exit;
+            }
+        }
+
+        // STEP 3: Complete Failure
+        header("Location: ../../views/auth/login.php?error=" . urlencode("Invalid login credentials."));
+        exit;
 
     } catch (Exception $e) {
         header("Location: ../../views/auth/login.php?error=" . urlencode("System Error: " . $e->getMessage()));

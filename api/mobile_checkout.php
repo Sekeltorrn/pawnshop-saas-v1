@@ -5,27 +5,23 @@ require_once '../config/db_connect.php';
 require_once '../config/paymongo.php';
 
 // 1. GET POST DATA FROM ANDROID
-$data = json_decode(file_get_contents("php://input"), true);
-$ticket_no = $data['ticket_no'] ?? null;
-$type = $data['payment_type'] ?? 'renewal'; // 'renewal', 'redemption', or 'principal'
-$custom_amount = $data['amount'] ?? null; // Added to catch manual inputs for Partial Payments
-$tenant_schema = $data['tenant_schema'] ?? null;
+$json_input = json_decode(file_get_contents('php://input'), true);
+$ticket_no = $_POST['ticket_no'] ?? $json_input['ticket_no'] ?? null;
+$type = $_POST['payment_type'] ?? $json_input['payment_type'] ?? 'renewal';
+$custom_amount = $_POST['amount'] ?? $json_input['amount'] ?? null;
+$tenant_schema = $_POST['tenant_schema'] ?? $json_input['tenant_schema'] ?? null;
 
-if (!$ticket_no) {
-    echo json_encode(['success' => false, 'message' => 'Missing ticket number']);
-    exit;
-}
-
-if (!$tenant_schema) {
-    echo json_encode(['success' => false, 'message' => 'Unauthorized: No tenant context']);
+if (!$ticket_no || !$tenant_schema) {
+    echo json_encode(['success' => false, 'message' => 'Matrix Error: Missing Authorization Context (Ticket/Tenant ID)']);
     exit;
 }
 
 try {
     // 2. FETCH TICKET & CUSTOMER INFO
+    $pdo->exec("SET search_path TO \"$tenant_schema\"");
     $stmt = $pdo->prepare("SELECT l.*, c.first_name, c.last_name, c.email, c.contact_no 
-                           FROM \"{$tenant_schema}\".loans l 
-                           JOIN \"{$tenant_schema}\".customers c ON l.customer_id = c.customer_id 
+                           FROM loans l 
+                           JOIN customers c ON l.customer_id = c.customer_id 
                            WHERE l.pawn_ticket_no = ?");
     $stmt->execute([str_replace('PT-', '', $ticket_no)]);
     $loan = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -59,8 +55,8 @@ try {
     }
     
     // 4. GENERATE UNIQUE REFERENCE FOR WEBHOOK
-    // Format: PT-{tenant_schema}-{ticket}-{intent}-{timestamp}
-    $reference = "PT-" . $tenant_schema . "-" . $loan['pawn_ticket_no'] . "-" . $intent . "-" . time();
+    // Format: PT-{tenant_schema}-{pawn_ticket_no}-{intent}
+    $reference = "PT-" . $tenant_schema . "-" . $loan['pawn_ticket_no'] . "-" . $intent;
 
     $customer_info = [
         'name' => $loan['first_name'] . ' ' . $loan['last_name'],

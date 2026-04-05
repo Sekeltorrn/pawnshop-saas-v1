@@ -12,7 +12,7 @@ if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
 
 // 2. CONNECT TO DATABASE
 // (Adjust this path if your header.php is located somewhere else!)
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../../../config/db_connect.php';
 
 // 3. LISTEN FOR SUPER ADMIN BROADCASTS
 $global_announcement = '';

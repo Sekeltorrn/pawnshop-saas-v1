@@ -59,7 +59,7 @@ try {
 }
 
 $pageTitle = 'Vault Inventory';
-include '../../includes/header.php';
+include 'includes/header.php';
 ?>
 
 <div class="max-w-7xl mx-auto w-full px-4 pb-12">
@@ -98,7 +98,7 @@ include '../../includes/header.php';
         <div class="bg-[#141518] border border-white/5 p-5 border-l-2 border-l-[#00ff41] relative overflow-hidden group">
             <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-6xl text-[#00ff41]/10 group-hover:scale-110 transition-transform">diamond</span>
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Total_Appraisal_Value</p>
-            <h3 class="text-2xl font-black text-[#00ff41] font-display">₱<?= number_format($total_appraisal, 2) ?></h3>
+            <h3 class="text-2xl font-black text-[#00ff41] font-display">â‚±<?= number_format($total_appraisal, 2) ?></h3>
             <p class="text-[8px] text-[#00ff41]/70 font-mono uppercase mt-2">Sum of Vaulted Assets</p>
         </div>
 
@@ -182,7 +182,7 @@ include '../../includes/header.php';
                             </p>
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <p class="text-xs font-black font-mono text-white">₱<?= number_format($item['appraised_value'], 2) ?></p>
+                            <p class="text-xs font-black font-mono text-white">â‚±<?= number_format($item['appraised_value'], 2) ?></p>
                         </td>
                         <td class="px-4 py-3 text-center">
                             <button onclick="viewItemDetails(this)" 
@@ -229,7 +229,7 @@ include '../../includes/header.php';
                 </div>
                 <div class="text-right">
                     <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">System Appraisal</p>
-                    <p class="text-xl font-black text-[#00ff41] font-mono" id="modal_appraisal">₱0.00</p>
+                    <p class="text-xl font-black text-[#00ff41] font-mono" id="modal_appraisal">â‚±0.00</p>
                 </div>
             </div>
 
@@ -274,7 +274,7 @@ include '../../includes/header.php';
         document.getElementById('modal_name').innerText = item.item_name || 'UNKNOWN ASSET';
         
         const fmt = (num) => parseFloat(num).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.getElementById('modal_appraisal').innerText = '₱' + fmt(item.appraised_value);
+        document.getElementById('modal_appraisal').innerText = 'â‚±' + fmt(item.appraised_value);
         
         document.getElementById('modal_specs').innerText = item.item_description || 'No specs recorded.';
         document.getElementById('modal_serial').innerText = item.serial_number || 'N/A';
@@ -291,4 +291,4 @@ include '../../includes/header.php';
     }
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

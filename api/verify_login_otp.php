@@ -31,15 +31,15 @@ try {
     exit();
 }
 
-// 3. Capture Data from Android App
-$inputData = json_decode(file_get_contents("php://input"), true);
-$email      = $inputData['email'] ?? '';
-$code       = $inputData['code'] ?? '';
-$schemaName = $inputData['schema_name'] ?? '';
+// 3. Capture Data from Android App (Standardized)
+$json_input = json_decode(file_get_contents('php://input'), true);
+$email      = $_POST['email'] ?? $json_input['email'] ?? '';
+$code       = $_POST['code'] ?? $json_input['code'] ?? '';
+$schemaName = $_POST['tenant_schema'] ?? $json_input['tenant_schema'] ?? $_POST['schema_name'] ?? $json_input['schema_name'] ?? '';
 
 if (empty($email) || empty($code) || empty($schemaName)) {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Email, Code, and Shop Schema are required."]);
+    echo json_encode(["status" => "error", "message" => "Matrix Error: Missing Authorization Context (Email/Code/Tenant ID)"]);
     exit();
 }
 

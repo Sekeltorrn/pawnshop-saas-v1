@@ -22,42 +22,18 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
 
     <nav class="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
         
-        <a class="<?= $base_class ?> <?= ($current_page == 'customer_sandbox.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/customer_sandbox.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'customer_sandbox.php') ? $active_icon : $inactive_icon ?>">sandbox</span>
-            Sandbox
-        </a>
-        
         <a class="<?= $base_class ?> <?= ($current_page == 'dashboard.php' || $current_page == 'index.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/dashboard.php">
             <span class="material-symbols-outlined text-lg <?= ($current_page == 'dashboard.php' || $current_page == 'index.php') ? $active_icon : $inactive_icon ?>">dashboard</span>
             Overview
         </a>
-        
-        <a class="<?= $base_class ?> <?= ($current_page == 'transactions.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/transactions.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'transactions.php') ? $active_icon : $inactive_icon ?>">receipt_long</span>
-            Ledger
+
+        <a class="<?= $base_class ?> <?= ($current_page == 'audit_dashboard.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/audit_dashboard.php">
+        <span class="material-symbols-outlined text-lg <?= ($current_page == 'audit_dashboard.php') ? $active_icon : $inactive_icon ?>">history</span>
+        Audit Logs
         </a>
 
-        <a class="<?= $base_class ?> <?= ($current_page == 'history.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/history.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'history.php') ? $active_icon : $inactive_icon ?>">history</span>
-            Transactions
-        </a>
 
-        <a class="<?= $base_class ?> <?= ($current_page == 'payments.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/payments.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'payments.php') ? $active_icon : $inactive_icon ?>">credit_card</span>
-            Payment Node
-        </a>
-
-        <a class="<?= $base_class ?> <?= ($current_page == 'customers.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/customers.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'customers.php') ? $active_icon : $inactive_icon ?>">people</span>
-            Suki Base
-        </a>
-
-        <a class="<?= $base_class ?> <?= ($current_page == 'inventory.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/inventory.php">
-            <span class="material-symbols-outlined text-lg <?= ($current_page == 'inventory.php') ? $active_icon : $inactive_icon ?>">inventory_2</span>
-            Vault
-        </a>
-
-        <a class="<?= $base_class ?> <?= ($current_page == 'employees.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/employees.php">
+         <a class="<?= $base_class ?> <?= ($current_page == 'employees.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/employees.php">
             <span class="material-symbols-outlined text-lg <?= ($current_page == 'employees.php') ? $active_icon : $inactive_icon ?>">badge</span>
             Personnel
         </a>

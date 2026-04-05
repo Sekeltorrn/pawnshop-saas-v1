@@ -78,7 +78,7 @@ try {
 }
 
 $pageTitle = 'Financial Reports';
-include '../../includes/header.php';
+include 'includes/header.php';
 ?>
 
 <div class="max-w-7xl mx-auto w-full px-4 pb-12 mt-6">
@@ -117,25 +117,25 @@ include '../../includes/header.php';
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div class="bg-[#141518] border border-white/5 p-6 border-l-2 border-l-[#ff6b00]">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Capital Deployed (Out)</p>
-            <h3 class="text-2xl font-black text-white font-mono mt-1 tracking-tight">₱<?= number_format($loan_stats['total_deployed'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-white font-mono mt-1 tracking-tight">â‚±<?= number_format($loan_stats['total_deployed'], 2) ?></h3>
             <p class="text-[9px] text-slate-500 font-mono uppercase mt-2"><?= $loan_stats['loans_issued'] ?> Loans Issued</p>
         </div>
 
         <div class="bg-[#141518] border border-white/5 p-6 border-l-2 border-l-[#00ff41]">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Cash Collected (In)</p>
-            <h3 class="text-2xl font-black text-[#00ff41] font-mono mt-1 tracking-tight">₱<?= number_format($payment_stats['total_collected'] + $loan_stats['fees_collected'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-[#00ff41] font-mono mt-1 tracking-tight">â‚±<?= number_format($payment_stats['total_collected'] + $loan_stats['fees_collected'], 2) ?></h3>
             <p class="text-[9px] text-[#00ff41]/70 font-mono uppercase mt-2"><?= $payment_stats['transaction_count'] ?> Payment Transactions</p>
         </div>
 
         <div class="bg-[#141518] border border-white/5 p-6 border-l-2 border-l-purple-500">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Interest Revenue (Profit)</p>
-            <h3 class="text-2xl font-black text-white font-mono mt-1 tracking-tight">₱<?= number_format($payment_stats['interest_collected'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-white font-mono mt-1 tracking-tight">â‚±<?= number_format($payment_stats['interest_collected'], 2) ?></h3>
             <p class="text-[9px] text-slate-500 font-mono uppercase mt-2">From Renewals</p>
         </div>
 
         <div class="bg-[#141518] border border-white/5 p-6 border-l-2 border-l-blue-500">
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Principal Recovered + Fees</p>
-            <h3 class="text-2xl font-black text-white font-mono mt-1 tracking-tight">₱<?= number_format($payment_stats['principal_collected'] + $loan_stats['fees_collected'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-white font-mono mt-1 tracking-tight">â‚±<?= number_format($payment_stats['principal_collected'] + $loan_stats['fees_collected'], 2) ?></h3>
             <p class="text-[9px] text-slate-500 font-mono uppercase mt-2">Redemptions & Service Fees</p>
         </div>
     </div>
@@ -183,14 +183,14 @@ include '../../includes/header.php';
                                 <span class="text-[9px] font-black uppercase tracking-widest <?= $type_color ?> bg-white/5 px-2 py-1 border border-white/10"><?= $type_label ?></span>
                             </td>
                             <td class="px-5 py-3 text-[10px] text-slate-500 font-mono"><?= htmlspecialchars($p['reference_number'] ?: $p['or_number'] ?: 'N/A') ?></td>
-                            <td class="px-5 py-3 text-right text-xs font-black font-mono text-[#00ff41]">+ ₱<?= number_format($p['amount'], 2) ?></td>
+                            <td class="px-5 py-3 text-right text-xs font-black font-mono text-[#00ff41]">+ â‚±<?= number_format($p['amount'], 2) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
             <div class="p-4 border-t border-white/5 text-right bg-[#0a0b0d]">
-                <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Total Inflow: <span class="text-[#00ff41] text-sm font-mono ml-2">₱<?= number_format($payment_stats['total_collected'], 2) ?></span></p>
+                <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Total Inflow: <span class="text-[#00ff41] text-sm font-mono ml-2">â‚±<?= number_format($payment_stats['total_collected'], 2) ?></span></p>
             </div>
         </div>
 
@@ -221,15 +221,15 @@ include '../../includes/header.php';
                             <td class="px-5 py-3">
                                 <span class="text-[9px] font-black uppercase tracking-widest <?= $status_color ?>"><?= $l['status'] ?></span>
                             </td>
-                            <td class="px-5 py-3 text-right text-[10px] font-mono text-purple-400">₱<?= number_format($l['service_charge'], 2) ?></td>
-                            <td class="px-5 py-3 text-right text-xs font-black font-mono text-white">₱<?= number_format($l['principal_amount'], 2) ?></td>
+                            <td class="px-5 py-3 text-right text-[10px] font-mono text-purple-400">â‚±<?= number_format($l['service_charge'], 2) ?></td>
+                            <td class="px-5 py-3 text-right text-xs font-black font-mono text-white">â‚±<?= number_format($l['principal_amount'], 2) ?></td>
                         </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
             <div class="p-4 border-t border-white/5 text-right bg-[#0a0b0d]">
-                <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Total Outflow: <span class="text-white text-sm font-mono ml-2">₱<?= number_format($loan_stats['total_deployed'], 2) ?></span></p>
+                <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Total Outflow: <span class="text-white text-sm font-mono ml-2">â‚±<?= number_format($loan_stats['total_deployed'], 2) ?></span></p>
             </div>
         </div>
     </div>
@@ -265,4 +265,4 @@ include '../../includes/header.php';
     }
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

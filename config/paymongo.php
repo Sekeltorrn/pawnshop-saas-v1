@@ -9,7 +9,7 @@
  * @param array $customer Optional: ['name' => 'John Doe', 'email' => 'juan@example.com', 'phone' => '09123456789']
  * @return array ['success' => true, 'checkout_url' => 'https://...', 'checkout_id' => 'cs_...'] OR ['success' => false, 'error' => '...']
  */
-function createPaymongoCheckout($amount, $description, $reference_number, $customer = []) {
+function createPaymongoCheckout($amount, $description, $reference_number, $customer = [], $custom_success_url = null) {
     // 1. LOAD SECRET KEY (From Render Env Vars or local fallback)
     $secret_key = getenv('PAYMONGO_SECRET_KEY');
     
@@ -17,7 +17,15 @@ function createPaymongoCheckout($amount, $description, $reference_number, $custo
         // Fallback for local development if getenv() isn't loading the .env file directly
         $env_path = __DIR__ . '/../.env';
         if (file_exists($env_path)) {
-            $env = parse_ini_file($env_path);
+            $env = [];
+            $lines = file($env_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach ($lines as $line) {
+                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos($line, '=') !== false) {
+                    list($name, $value) = explode('=', $line, 2);
+                    $env[trim($name)] = trim($value, " \t\n\r\0\x0B\"");
+                }
+            }
             $secret_key = $env['PAYMONGO_SECRET_KEY'] ?? null;
         }
     }
@@ -56,7 +64,7 @@ function createPaymongoCheckout($amount, $description, $reference_number, $custo
                     'qrph'
                 ],
                 'reference_number' => $reference_number,
-                'success_url' => $base_url . '/api/payment_success.php?reference=' . urlencode($reference_number),
+                'success_url' => $custom_success_url ? $custom_success_url : $base_url . '/api/payment_success.php?reference=' . urlencode($reference_number),
                 'cancel_url' => $base_url . '/api/payment_cancel.php?reference=' . urlencode($reference_number)
             ]
         ]

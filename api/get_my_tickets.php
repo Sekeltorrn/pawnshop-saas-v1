@@ -12,28 +12,14 @@ $response = [
     'message' => ''
 ];
 
-$customer_id = $_GET['customer_id'] ?? null;
-$shop_code = $_GET['shop_code'] ?? null; // 🔴 NEW: The app must tell us which shop to look at!
-$status = $_GET['status'] ?? 'active'; // 🆕 Optional: Filter by ticket status (active, renewed, redeemed, expired)
+$json_input = json_decode(file_get_contents('php://input'), true);
+$customer_id = $_POST['customer_id'] ?? $json_input['customer_id'] ?? $_GET['customer_id'] ?? null;
+$tenant_schema = $_POST['tenant_schema'] ?? $json_input['tenant_schema'] ?? $_GET['tenant_schema'] ?? null;
+$status = $_POST['status'] ?? $json_input['status'] ?? $_GET['status'] ?? 'active';
 
-// Validate status parameter to prevent SQL injection
-$valid_statuses = ['active', 'renewed', 'redeemed', 'expired', 'past_due'];
-if (!in_array($status, $valid_statuses)) {
-    $status = 'active'; // Default to active if invalid
-}
-
-if (!$customer_id || !$shop_code) {
-    $response['message'] = 'Access Denied: Missing Client ID or Shop Code';
-    echo json_encode($response);
+if (!$customer_id || !$tenant_schema) {
+    echo json_encode(['success' => false, 'message' => 'Matrix Error: Missing Authorization Context (Tenant ID)']);
     exit;
-}
-
-// 🟢 NEW SMART PREFIX CHECK
-$sanitized = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', $shop_code));
-if (strpos($sanitized, 'tenant_') === 0) {
-    $tenant_schema = $sanitized;
-} else {
-    $tenant_schema = 'tenant_' . $sanitized;
 }
 
 try {
@@ -43,6 +29,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT 
             loans.pawn_ticket_no, 
+            loans.reference_no, 
             loans.principal_amount, 
             loans.due_date, 
             loans.status,
@@ -60,13 +47,14 @@ try {
     foreach ($loans as $loan) {
         $formatted_tickets[] = [
             'pawn_ticket_no' => (int) $loan['pawn_ticket_no'],
+            'reference_no' => $loan['reference_no'],
             'principal_amount' => (float) $loan['principal_amount'],
             'due_date' => $loan['due_date'],
             'status' => $loan['status'],
             'maturity_date' => null,
             'expiration_date' => null,
             'inventory' => [
-                'item_name' => $loan['item_name'] ?? 'Vault Item'
+                'item_name' => !empty(trim($loan['item_name'])) ? trim($loan['item_name']) : 'Vault Item'
             ]
         ];
     }

@@ -25,12 +25,13 @@ $supabase = new Supabase();
 
 // 3. Ensure files were actually sent
 if (empty($_FILES['id_document'])) {
-    echo json_encode(['success' => false, 'message' => 'No documents were received by the server.']);
+    echo json_encode(['success' => false, 'message' => 'Front ID document missing.']);
     exit;
 }
 
 $bucket = 'kyc-documents';
-$file = $_FILES['id_document'];
+$front_file = $_FILES['id_document'];
+$back_file = $_FILES['id_document_back'] ?? null;
 
 // 4. CORRECTED ROUTE: Go up exactly ONE level (../) to find the .env file
 $envPath = __DIR__ . '/../.env';
@@ -57,62 +58,65 @@ if (!$supabase_url) {
 
 $public_base_url = rtrim($supabase_url, '/') . '/storage/v1/object/public/' . $bucket . '/';
 
-// 5. Basic Validation
-if ($file['error'] !== UPLOAD_ERR_OK) {
-    echo json_encode(['success' => false, 'message' => 'Upload stream error code: ' . $file['error']]);
+// 5. Upload Front ID
+if ($front_file['error'] !== UPLOAD_ERR_OK) {
+    echo json_encode(['success' => false, 'message' => 'Front upload error: ' . $front_file['error']]);
     exit;
 }
 
-$tmpPath = $file['tmp_name'];
-// Safely detect MIME type
-$mimeType = mime_content_type($tmpPath) ?: $file['type'];
+$tmpFront = $front_file['tmp_name'];
+$mimeFront = mime_content_type($tmpFront) ?: $front_file['type'];
+$extFront = pathinfo($front_file['name'], PATHINFO_EXTENSION) ?: 'jpg';
+$nameFront = 'KYC_FRONT_' . $customer_id . '_' . time() . '.' . $extFront;
 
-// Create a secure, unique filename
-$extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-if (!$extension) $extension = 'jpg'; // fallback
+$upFront = $supabase->uploadFile($bucket, $tmpFront, $nameFront, $mimeFront);
 
-$secure_filename = 'KYC_' . $customer_id . '_' . time() . '.' . $extension;
+if ($upFront['code'] < 200 || $upFront['code'] >= 300) {
+    echo json_encode(['success' => false, 'message' => 'Supabase rejected front document.', 'details' => $upFront['body']]);
+    exit;
+}
 
-// 6. Fire it to Supabase Storage!
-$uploadResponse = $supabase->uploadFile($bucket, $tmpPath, $secure_filename, $mimeType);
+$front_url = $public_base_url . $nameFront;
+$back_url = null;
 
-// 7. Check if upload was successful (HTTP 200 OK)
-if ($uploadResponse['code'] >= 200 && $uploadResponse['code'] < 300) {
-    
-    // Build the public URL so the Admin can see it later
-    $final_url = $public_base_url . $secure_filename;
-    
-    // Send the Database Update
-    try {
-        // 🔥 FIXED: Using id_image_url, id_type, and id_number to match your schema!
-        $stmt = $pdo->prepare("
-            UPDATE \"{$tenant_schema}\".customers 
-            SET id_image_url = ?, 
-                id_type = ?, 
-                id_number = ?, 
-                status = 'pending' 
-            WHERE customer_id = ?
-        ");
-        $stmt->execute([$final_url, $id_type, $id_number, $customer_id]);
+// 6. Upload Back ID (Optional but recommended)
+if ($back_file && $back_file['error'] === UPLOAD_ERR_OK) {
+    $tmpBack = $back_file['tmp_name'];
+    $mimeBack = mime_content_type($tmpBack) ?: $back_file['type'];
+    $extBack = pathinfo($back_file['name'], PATHINFO_EXTENSION) ?: 'jpg';
+    $nameBack = 'KYC_BACK_' . $customer_id . '_' . time() . '.' . $extBack;
 
-        echo json_encode([
-            'success' => true, 
-            'message' => 'Credentials securely transmitted to Command Core.',
-            'path' => $final_url
-        ]);
-    } catch (PDOException $e) {
-        echo json_encode([
-            'success' => false, 
-            'message' => 'File uploaded, but database update failed.',
-            'db_error' => $e->getMessage()
-        ]);
+    $upBack = $supabase->uploadFile($bucket, $tmpBack, $nameBack, $mimeBack);
+    if ($upBack['code'] >= 200 && $upBack['code'] < 300) {
+        $back_url = $public_base_url . $nameBack;
     }
-} else {
-    // Supabase rejected the payload
+}
+
+// 7. Send the Database Update
+try {
+    $pdo->exec("SET search_path TO \"$tenant_schema\"");
+    $stmt = $pdo->prepare("
+        UPDATE customers 
+        SET id_photo_front_url = ?, 
+            id_photo_back_url = ?, 
+            id_type = ?, 
+            id_number = ?, 
+            status = 'pending' 
+        WHERE customer_id = ?
+    ");
+    $stmt->execute([$front_url, $back_url, $id_type, $id_number, $customer_id]);
+
+    echo json_encode([
+        'success' => true, 
+        'message' => 'Dual credentials securely transmitted to Command Core.',
+        'front_path' => $front_url,
+        'back_path' => $back_url
+    ]);
+} catch (PDOException $e) {
     echo json_encode([
         'success' => false, 
-        'message' => 'Supabase rejected the document.',
-        'error_details' => $uploadResponse['body'] ?? 'Unknown Error'
+        'message' => 'Files uploaded, but database update failed.',
+        'db_error' => $e->getMessage()
     ]);
 }
 exit;

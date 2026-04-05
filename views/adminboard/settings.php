@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
                 gold_rate_24k = ?,
                 diamond_base_rate = ?,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = 1
+            WHERE setting_id = (SELECT setting_id FROM " . $tenant_schema . ".tenant_settings LIMIT 1)
         ");
         
         $stmt->execute([
@@ -69,7 +69,7 @@ try {
 
 // 4. FETCH CURRENT SETTINGS
 try {
-    $stmt = $pdo->prepare("SELECT * FROM " . $tenant_schema . ".tenant_settings WHERE id = 1");
+    $stmt = $pdo->prepare("SELECT * FROM " . $tenant_schema . ".tenant_settings LIMIT 1");
     $stmt->execute();
     $settings = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -86,7 +86,7 @@ try {
 }
 
 $pageTitle = 'Node Configuration';
-include '../../includes/header.php';
+include 'includes/header.php';
 ?>
 
 <div class="max-w-7xl mx-auto w-full px-4 pb-12">
@@ -170,9 +170,9 @@ include '../../includes/header.php';
                                 </div>
 
                                 <div>
-                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Fixed Service Fee (₱)</label>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Fixed Service Fee (â‚±)</label>
                                     <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-[#ff6b00]/50 transition-colors">
-                                        <span class="text-slate-500 font-mono pl-4">₱</span>
+                                        <span class="text-slate-500 font-mono pl-4">â‚±</span>
                                         <input type="number" step="0.01" name="service_fee" value="<?= htmlspecialchars($settings['service_fee']) ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
                                     </div>
                                 </div>
@@ -190,7 +190,7 @@ include '../../includes/header.php';
                                     <div class="col-span-2">
                                         <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">18K Gold Purity (Per Gram)</label>
                                         <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-purple-500/50 transition-colors">
-                                            <span class="text-slate-500 font-mono pl-4">₱</span>
+                                            <span class="text-slate-500 font-mono pl-4">â‚±</span>
                                             <input type="number" step="0.01" name="gold_rate_18k" value="<?= htmlspecialchars($settings['gold_rate_18k']) ?>" class="w-full bg-transparent p-4 text-purple-400 font-bold text-xs font-mono outline-none">
                                         </div>
                                     </div>
@@ -207,7 +207,7 @@ include '../../includes/header.php';
                                 <div class="pt-2 border-t border-white/5">
                                     <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1 mt-3">Diamond Base Rate (Per Carat)</label>
                                     <div class="flex items-center bg-[#0f1115] border border-white/5 focus-within:border-purple-500/50 transition-colors">
-                                        <span class="text-slate-500 font-mono pl-4">₱</span>
+                                        <span class="text-slate-500 font-mono pl-4">â‚±</span>
                                         <input type="number" step="0.01" name="diamond_base_rate" value="<?= htmlspecialchars($settings['diamond_base_rate']) ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
                                     </div>
                                 </div>
@@ -504,5 +504,5 @@ include '../../includes/header.php';
 
 <?php 
 // Ensure footer.php exists to close tags properly
-include '../../includes/footer.php'; 
+include 'includes/footer.php'; 
 ?>

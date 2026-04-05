@@ -88,7 +88,7 @@ if ($http_code == 200 && isset($result['access_token'])) {
 
         try {
             // 6. SAVE TO TENANT DATABASE
-            $pdo->exec("SET search_path TO \"$schemaName\"");
+            $pdo->exec("SET search_path TO \"$schemaName\", public;");
             
             // SQL ADJUSTED TO YOUR SCHEMA: auth_user_id, contact_no, password
             $stmt = $pdo->prepare("INSERT INTO customers (auth_user_id, first_name, last_name, email, contact_no, password, is_walk_in, status) 

@@ -13,9 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// 2. Capture Data from Android App
-$inputData = json_decode(file_get_contents("php://input"), true);
-$email = $inputData['email'] ?? '';
+// 2. Capture Data from Android App (Standardized)
+$json_input = json_decode(file_get_contents('php://input'), true);
+$email = $_POST['email'] ?? $json_input['email'] ?? '';
 
 if (empty($email)) {
     http_response_code(400);

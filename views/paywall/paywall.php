@@ -12,7 +12,7 @@ if (!isset($_SESSION['user_id'])) {
 // 2. Security Check: Have they already paid?
 // If they are 'active', kick them straight to the main app dashboard.
 if (isset($_SESSION['payment_status']) && $_SESSION['payment_status'] === 'active') {
-    header("Location: ../adminboard/dashboard.php");
+    header("Location: ../boardstaff/dashboard.php");
     exit;
 }
 

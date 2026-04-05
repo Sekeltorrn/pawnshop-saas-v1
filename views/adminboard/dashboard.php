@@ -71,7 +71,7 @@ try {
 }
 
 $pageTitle = 'Command Center';
-include '../../includes/header.php';
+include 'includes/header.php';
 ?>
 
 <div class="max-w-7xl mx-auto w-full px-4 pb-12 mt-6">
@@ -87,9 +87,7 @@ include '../../includes/header.php';
             </h1>
         </div>
         <div class="flex gap-3">
-            <a href="create_ticket.php" class="bg-[#ff6b00] text-black font-black text-[10px] uppercase tracking-[0.2em] px-6 py-3 shadow-[0_0_20px_rgba(255,107,0,0.3)] hover:shadow-[0_0_30px_rgba(255,107,0,0.5)] active:scale-95 transition-all flex items-center justify-center gap-2">
-                <span class="material-symbols-outlined text-sm">add</span> New Loan
-            </a>
+            <!-- Operational actions moved to Boardstaff -->
         </div>
     </div>
 
@@ -100,7 +98,7 @@ include '../../includes/header.php';
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
                 <span class="material-symbols-outlined text-[#ff6b00] text-sm">account_balance</span> Capital Deployed
             </p>
-            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">₱<?= number_format($financials['total_capital_out'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">â‚±<?= number_format($financials['total_capital_out'], 2) ?></h3>
             <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
                 <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Active Contracts</span>
                 <span class="text-[10px] text-[#ff6b00] font-mono font-bold"><?= $financials['total_active_loans'] ?> TCKTS</span>
@@ -112,7 +110,7 @@ include '../../includes/header.php';
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
                 <span class="material-symbols-outlined text-[#00ff41] text-sm">trending_up</span> Projected Monthly Interest
             </p>
-            <h3 class="text-2xl font-black text-[#00ff41] font-mono mt-2 tracking-tight">+ ₱<?= number_format($financials['expected_monthly_interest'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-[#00ff41] font-mono mt-2 tracking-tight">+ â‚±<?= number_format($financials['expected_monthly_interest'], 2) ?></h3>
             <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
                 <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Avg Yield</span>
                 <span class="text-[10px] text-[#00ff41] font-mono font-bold">~3.5%</span>
@@ -173,7 +171,7 @@ include '../../includes/header.php';
                                 </div>
                                 <div class="text-right">
                                     <p class="text-xs font-mono font-black <?= $urgent_color ?>"><?= $days_left > 0 ? $days_left . ' Days Left' : 'DUE NOW' ?></p>
-                                    <p class="text-[9px] text-slate-500 font-mono uppercase mt-0.5">₱<?= number_format($t['principal_amount'], 2) ?></p>
+                                    <p class="text-[9px] text-slate-500 font-mono uppercase mt-0.5">â‚±<?= number_format($t['principal_amount'], 2) ?></p>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -220,7 +218,7 @@ include '../../includes/header.php';
                                     </p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-sm font-mono font-black text-[#00ff41]">+ ₱<?= number_format($p['amount'], 2) ?></p>
+                                    <p class="text-sm font-mono font-black text-[#00ff41]">+ â‚±<?= number_format($p['amount'], 2) ?></p>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -232,4 +230,4 @@ include '../../includes/header.php';
     </div>
 </div>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

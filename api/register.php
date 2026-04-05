@@ -11,14 +11,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// 2. Capture Data from Android App
-$inputData = json_decode(file_get_contents("php://input"), true);
-
-$email      = $inputData['email'] ?? '';
-$password   = $inputData['password'] ?? '';
-$fullName   = $inputData['full_name'] ?? '';
-$phone      = $inputData['phone_number'] ?? '';
-$schemaName = $inputData['schema_name'] ?? '';
+// 2. Capture Data from Android App (Standardized)
+$json_input = json_decode(file_get_contents('php://input'), true);
+$email      = $_POST['email'] ?? $json_input['email'] ?? '';
+$password   = $_POST['password'] ?? $json_input['password'] ?? '';
+$fullName   = $_POST['full_name'] ?? $json_input['full_name'] ?? '';
+$phone      = $_POST['phone_number'] ?? $json_input['phone_number'] ?? '';
+$schemaName = $_POST['tenant_schema'] ?? $json_input['tenant_schema'] ?? $_POST['schema_name'] ?? $json_input['schema_name'] ?? '';
 
 // Basic Validation
 if (empty($email) || empty($password) || empty($schemaName)) {

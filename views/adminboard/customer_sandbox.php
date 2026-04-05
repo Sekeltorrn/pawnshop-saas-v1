@@ -46,20 +46,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if ($payment_type === 'interest') {
             // RENEWAL: Pay interest only. Extend due date by 1 month.
             $pdo->prepare("UPDATE \"{$schemaName}\".loans SET due_date = due_date + INTERVAL '1 month' WHERE loan_id = ?")->execute([$loan_id]);
-            $msg = "Renewal successful: ₱" . number_format($amount, 2) . " interest paid. Due date extended 1 month.";
+            $msg = "Renewal successful: â‚±" . number_format($amount, 2) . " interest paid. Due date extended 1 month.";
             
         } elseif ($payment_type === 'principal') {
             // PARTIAL PAYMENT: Amount pays the interest FIRST, the rest lowers the principal. Extend due date.
             $principal_reduction = $amount - $current_interest_due;
             
             if ($principal_reduction <= 0) {
-                throw new Exception("Partial payment must be greater than the interest due (₱" . number_format($current_interest_due, 2) . ").");
+                throw new Exception("Partial payment must be greater than the interest due (â‚±" . number_format($current_interest_due, 2) . ").");
             }
 
             $pdo->prepare("UPDATE \"{$schemaName}\".loans SET principal_amount = principal_amount - ?, due_date = due_date + INTERVAL '1 month' WHERE loan_id = ?")
                 ->execute([$principal_reduction, $loan_id]);
                 
-            $msg = "Partial successful: ₱" . number_format($current_interest_due, 2) . " covered interest. Principal reduced by ₱" . number_format($principal_reduction, 2) . "!";
+            $msg = "Partial successful: â‚±" . number_format($current_interest_due, 2) . " covered interest. Principal reduced by â‚±" . number_format($principal_reduction, 2) . "!";
             
         } elseif ($payment_type === 'full_redemption') {
             // FULL REDEMPTION: Close the loan.
@@ -128,7 +128,7 @@ if ($current_customer_id) {
 }
 
 $pageTitle = 'API Logic Sandbox';
-include '../../includes/header.php'; 
+include 'includes/header.php'; 
 ?>
 
 <div class="max-w-7xl mx-auto w-full px-4 pb-12 mt-6">
@@ -191,7 +191,7 @@ include '../../includes/header.php';
                             <div class="bg-[#0a0b0d] border border-white/5 p-2 text-[10px] font-mono">
                                 <div class="flex justify-between text-white">
                                     <span class="uppercase text-<?= $p['payment_type'] === 'interest' ? 'purple-400' : 'emerald-400' ?>"><?= $p['payment_type'] ?></span>
-                                    <span>₱<?= number_format($p['amount'], 2) ?></span>
+                                    <span>â‚±<?= number_format($p['amount'], 2) ?></span>
                                 </div>
                                 <div class="text-slate-500 mt-1">PT-<?= $p['pawn_ticket_no'] ?> | <?= date('M d, H:i', strtotime($p['payment_date'])) ?></div>
                             </div>
@@ -220,7 +220,7 @@ include '../../includes/header.php';
                         </div>
                         <div class="text-right font-mono">
                             <p class="text-[9px] text-slate-500 uppercase">Current Principal</p>
-                            <p class="text-xl font-black text-white">₱<?= number_format($loan['principal_amount'], 2) ?></p>
+                            <p class="text-xl font-black text-white">â‚±<?= number_format($loan['principal_amount'], 2) ?></p>
                         </div>
                     </div>
 
@@ -231,7 +231,7 @@ include '../../includes/header.php';
                         </div>
                         <div class="bg-[#0a0b0d] p-3 border border-white/5">
                             <p class="text-[8px] text-slate-500 uppercase font-black">Current Interest Due</p>
-                            <p class="text-sm font-mono text-purple-400">₱<?= number_format($interest_due, 2) ?></p>
+                            <p class="text-sm font-mono text-purple-400">â‚±<?= number_format($interest_due, 2) ?></p>
                         </div>
                         <div class="bg-[#0a0b0d] p-3 border border-white/5">
                             <p class="text-[8px] text-slate-500 uppercase font-black">Due Date</p>
@@ -258,7 +258,7 @@ include '../../includes/header.php';
                             </div>
 
                             <div class="w-1/3">
-                                <label class="text-[8px] text-slate-500 uppercase font-black block mb-1">Amount to Pay (₱)</label>
+                                <label class="text-[8px] text-slate-500 uppercase font-black block mb-1">Amount to Pay (â‚±)</label>
                                 <input type="number" step="0.01" name="amount" id="amt_<?= $loan['loan_id'] ?>" value="<?= $interest_due ?>" class="w-full bg-[#0a0b0d] border border-white/10 p-2 text-[#00ff41] font-bold text-xs font-mono outline-none">
                             </div>
 
@@ -293,9 +293,9 @@ function autoFillAmount(loanId, interestDue, totalRedemption) {
     } else if (typeSelect === 'principal') {
         amountInput.value = ''; 
         amountInput.readOnly = false;
-        amountInput.placeholder = "> ₱" + interestDue.toFixed(2);
+        amountInput.placeholder = "> â‚±" + interestDue.toFixed(2);
     }
 }
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

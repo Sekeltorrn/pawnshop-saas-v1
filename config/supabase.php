@@ -38,6 +38,10 @@ class Supabase {
         }
     }
 
+    public function getUrl() {
+        return $this->url;
+    }
+
     /**
      * Registers a new user in Supabase Auth
      * @param string $email
