@@ -67,7 +67,15 @@ try {
     die("Database Error: " . $e->getMessage());
 }
 
-// 4. FETCH CURRENT SETTINGS
+// 4. --- QR CODE GENERATION LOGIC ---
+$current_shop_code = $shopData['shop_code'] ?? $_SESSION['shop_code'] ?? 'UNKNOWN'; 
+$current_shop_slug = $shopData['shop_slug'] ?? '';
+$protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http');
+$landing_page_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . "/views/public/shop.php?code=" . urlencode($current_shop_slug);
+$qr_api_url = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" . urlencode($landing_page_url);
+// --------------------------------
+
+// 5. FETCH CURRENT SETTINGS
 try {
     $stmt = $pdo->prepare("SELECT * FROM " . $tenant_schema . ".tenant_settings LIMIT 1");
     $stmt->execute();
@@ -257,6 +265,27 @@ include 'includes/header.php';
                                     Update Portal Link
                                 </button>
                             </form>
+
+                            <div class="mt-8 pt-8 border-t border-white/5">
+                                <div class="bg-[#0a0b0d] border border-white/5 rounded-sm p-6 shadow-sm flex flex-col items-center text-center print-section">
+                                    <div class="flex items-center gap-2 mb-4 w-full justify-center">
+                                        <span class="material-symbols-outlined text-[#ff6b00]">qr_code_scanner</span>
+                                        <h3 class="text-sm font-display font-black text-white uppercase tracking-widest">In-Store Signage</h3>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mb-6 font-mono uppercase tracking-tight">Print this QR code and place it on your counter. Customers can scan it to download the app and automatically connect to your shop.</p>
+                                    
+                                    <div class="bg-white p-4 rounded-sm border border-white/10 mb-4 inline-block">
+                                        <img src="<?= htmlspecialchars($qr_api_url) ?>" alt="Scan to Download App" class="w-48 h-48 object-contain">
+                                    </div>
+                                    
+                                    <p class="text-[10px] text-slate-500 font-mono mb-4 italic">Node Code: <span class="text-[#00ff41] font-bold"><?= htmlspecialchars($current_shop_code) ?></span></p>
+                                    
+                                    <button onclick="window.print()" class="w-full bg-[#ff6b00] hover:bg-[#ff8c1a] text-black text-[10px] font-black py-4 rounded-sm transition-all uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,107,0,0.2)]">
+                                        <span class="material-symbols-outlined text-sm">print</span>
+                                        Print Signage
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="lg:col-span-8 bg-[#141518] border border-white/5 rounded overflow-hidden shadow-xl flex flex-col h-full">
@@ -427,6 +456,60 @@ include 'includes/header.php';
     }
     .active-cfg p:first-child { color: #ff6b00 !important; }
     .active-cfg span { color: #ff6b00 !important; }
+
+    @media print {
+        body { background: white !important; }
+        main, .max-w-7xl, .lg:col-span-9, #cfg-portal { 
+            display: block !important; 
+            width: 100% !important; 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            background: white !important;
+        }
+        .print-section {
+            visibility: visible !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: 9999 !important;
+            background: white !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        .print-section * {
+            visibility: visible !important;
+            color: black !important;
+        }
+        .print-section .material-symbols-outlined {
+            color: #ff6b00 !important;
+            font-size: 48px !important;
+        }
+        .print-section h3 {
+            font-size: 24px !important;
+            margin-bottom: 1rem !important;
+        }
+        .print-section p {
+            font-size: 14px !important;
+            max-width: 400px !important;
+        }
+        .print-section .w-48 {
+            width: 300px !important;
+            height: 300px !important;
+        }
+        .print-section button {
+            display: none !important;
+        }
+        /* Hide everything else */
+        aside, header, nav, .lg:col-span-3, .lg:col-span-8, #cfg-ops, .config-btn, .mb-8, .inline-flex, .bg-slate-800\/50, form, .scanline-overlay, .hex-grid::before {
+            display: none !important;
+        }
+    }
 </style>
 
 <script>
