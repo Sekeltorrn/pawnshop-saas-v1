@@ -3,3 +3,10 @@
 
 # Ignore Mac system files (if you are on Mac)
 .DS_Store
+
+# Root files
+tenant_schema.sql
+test_mobile_auth.html
+
+# Subfolders
+views/sandbox/
