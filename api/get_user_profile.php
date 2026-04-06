@@ -25,6 +25,27 @@ try {
         exit;
     }
 
+    // Check for pending profile change requests
+    $pending_stmt = $pdo->prepare("SELECT requested_email, requested_contact_no, requested_address FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
+    $pending_stmt->execute([$customer_id]);
+    $pending_request = $pending_stmt->fetch(PDO::FETCH_ASSOC);
+
+    $pending_fields = [];
+    if ($pending_request) {
+        if (!empty($pending_request['requested_email'])) {
+            $user['email'] = $pending_request['requested_email'];
+            $pending_fields[] = 'email';
+        }
+        if (!empty($pending_request['requested_contact_no'])) {
+            $user['contact_no'] = $pending_request['requested_contact_no'];
+            $pending_fields[] = 'contact_no';
+        }
+        if (!empty($pending_request['requested_address'])) {
+            $user['address'] = $pending_request['requested_address'];
+            $pending_fields[] = 'address';
+        }
+    }
+
     // derived status logic mirrored from dashboard
     $raw_status = $user['status'] ?? 'unverified';
     $derived_status = 'unverified';
@@ -48,10 +69,11 @@ try {
         'birthday' => (string)($user['birthday'] ?? ''),
         'id_photo_front_url' => $user['id_photo_front_url'],
         'id_photo_back_url' => $user['id_photo_back_url'],
-        'rejection_reason' => $user['rejection_reason']
+        'rejection_reason' => $user['rejection_reason'],
+        'pending_fields' => $pending_fields
     ]);
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error']);
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
 ?>
