@@ -40,7 +40,7 @@ try {
         $action = $_POST['action_type'] ?? '';
         $msg = "";
 
-        if ($action === 'authorize_profile_change') {
+        if ($action === 'approve_profile_change') { // Renamed from authorize_profile_change
             $req_id = $_POST['request_id'] ?? null;
             if ($req_id) {
                 try {
@@ -51,7 +51,7 @@ try {
                     if ($req) {
                         $stmt = $pdo->prepare("UPDATE customers SET email = ?, contact_no = ?, address = ?, updated_at = NOW() WHERE customer_id = ?");
                         $stmt->execute([$req['requested_email'], $req['requested_contact_no'], $req['requested_address'], $customer_id]);
-                        $stmt = $pdo->prepare("UPDATE profile_change_requests SET status = 'approved', updated_at = NOW() WHERE request_id = ?");
+                        $stmt = $pdo->prepare("UPDATE profile_change_requests SET status = 'approved', admin_notes = 'Approved by Staff', updated_at = NOW() WHERE request_id = ?");
                         $stmt->execute([$req_id]);
                         $pdo->commit();
                         $msg = "Mutation Sequence: COMMIT_SUCCESS";
@@ -65,7 +65,8 @@ try {
                 $stmt->execute([$req_id]);
                 $msg = "Mutation Sequence: REJECTED";
             }
-        } elseif ($action === 'reject') {
+        }
+ elseif ($action === 'reject') {
             $reason = $_POST['rejection_reason'] ?? 'Documents did not meet scanning requirements.';
             $stmt = $pdo->prepare("UPDATE customers SET status = 'unverified', id_photo_front_url = NULL, id_photo_back_url = NULL, rejection_reason = ?, updated_at = NOW() WHERE customer_id = ?");
             $stmt->execute([$reason, $customer_id]);
@@ -162,6 +163,43 @@ try {
 
     <?php if(isset($_GET['msg'])): ?>
         <div class="bg-primary/5 border border-primary/20 p-4 rounded-sm animate-pulse"><p class="text-[10px] font-headline font-bold text-primary uppercase tracking-[0.3em]">System_LOG: <?= htmlspecialchars($_GET['msg'] ?? '') ?></p></div>
+    <?php endif; ?>
+
+    <?php if($pendingReq): ?>
+        <div class="bg-error/10 border border-error/20 p-8 rounded-sm space-y-6">
+            <div class="flex items-center justify-between border-b border-error/10 pb-4">
+                <h3 class="text-[11px] font-headline font-bold text-error uppercase tracking-[0.2em] flex items-center gap-2">
+                    <span class="material-symbols-outlined text-sm">warning</span> 
+                    MUTATION_PENDING_AUTHORIZATION: Verification Required
+                </h3>
+                <span class="text-[9px] font-mono text-error/60 uppercase">Request_ID: <?= $pendingReq['request_id'] ?></span>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-4">
+                    <p class="text-[9px] font-headline font-bold text-on-surface-variant uppercase tracking-widest opacity-40">Current Data</p>
+                    <div class="space-y-2 text-[11px] font-mono opacity-80 italic">
+                        <p>EMAIL: <?= htmlspecialchars($customer['email'] ?? 'NOT_SET') ?></p>
+                        <p>PHONE: <?= htmlspecialchars($customer['contact_no'] ?? 'NOT_SET') ?></p>
+                        <p>ADDR: <?= htmlspecialchars($customer['address'] ?? 'NOT_SET') ?></p>
+                    </div>
+                </div>
+                <div class="space-y-4 bg-error/5 p-4 border border-error/10 rounded-sm">
+                    <p class="text-[9px] font-headline font-bold text-error uppercase tracking-widest">Requested Mutations</p>
+                    <div class="space-y-2 text-[11px] font-mono text-error font-bold italic">
+                        <p>NEW_MAIL: <?= htmlspecialchars($pendingReq['requested_email'] ?? 'NO_CHANGE') ?></p>
+                        <p>NEW_PHONE: <?= htmlspecialchars($pendingReq['requested_contact_no'] ?? 'NO_CHANGE') ?></p>
+                        <p>NEW_ADDR: <?= htmlspecialchars($pendingReq['requested_address'] ?? 'NO_CHANGE') ?></p>
+                    </div>
+                </div>
+            </div>
+
+            <form method="POST" class="flex justify-end gap-4 pt-4 border-t border-error/10">
+                <input type="hidden" name="request_id" value="<?= $pendingReq['request_id'] ?>">
+                <button type="submit" name="action_type" value="reject_profile_change" class="px-8 py-3 border border-error/50 text-error font-headline font-bold text-[10px] uppercase tracking-widest hover:bg-error hover:text-black transition-all rounded-sm italic">Abort_Mutation</button>
+                <button type="submit" name="action_type" value="approve_profile_change" class="px-8 py-3 bg-error text-black font-headline font-black text-[10px] uppercase tracking-widest hover:opacity-80 transition-all rounded-sm italic">Commit_Changes</button>
+            </form>
+        </div>
     <?php endif; ?>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -306,19 +344,9 @@ try {
                 <div class="flex items-center gap-4 border-b border-outline-variant/10 pb-6"><span class="material-symbols-outlined text-primary">security</span><h3 class="text-[10px] font-headline font-bold text-on-surface uppercase tracking-widest italic">Security_Ops_Module</h3></div>
 
                 <?php if($pendingReq): ?>
-                    <div class="bg-primary/5 border border-primary/20 p-8 rounded-sm animate-pulse space-y-6">
-                        <p class="text-[10px] font-headline font-black text-primary uppercase tracking-[0.4em] mb-4 flex items-center gap-2"><span class="material-symbols-outlined text-sm">warning</span> Mutation_Pending_Authorization</p>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 uppercase font-headline font-bold">
-                            <?php if($pendingReq['requested_email']): ?>
-                                <div class="bg-black/20 p-4 border-l-2 border-primary/40"><p class="text-[8px] opacity-40 mb-1">REPLACE_EMAIL</p><p class="text-[10px] line-through opacity-30 italic mb-1"><?= htmlspecialchars($customer['email'] ?? '') ?></p><p class="text-[12px] text-primary italic"><?= htmlspecialchars($pendingReq['requested_email']) ?></p></div>
-                            <?php endif; ?>
-                            <?php if($pendingReq['requested_contact_no']): ?>
-                                <div class="bg-black/20 p-4 border-l-2 border-primary/40"><p class="text-[8px] opacity-40 mb-1">REPLACE_CONTACT</p><p class="text-[10px] line-through opacity-30 italic mb-1"><?= htmlspecialchars($customer['contact_no'] ?? '') ?></p><p class="text-[12px] text-primary italic"><?= htmlspecialchars($pendingReq['requested_contact_no']) ?></p></div>
-                            <?php endif; ?>
-                        </div>
-                        <form method="POST" class="grid grid-cols-2 gap-4 pt-4">
-                            <input type="hidden" name="request_id" value="<?= $pendingReq['request_id'] ?>"><button type="submit" name="action_type" value="reject_profile_change" class="py-4 border border-error/30 text-error font-headline font-bold text-[10px] uppercase tracking-widest hover:bg-error hover:text-black transition-all rounded-sm italic">Reject_Mod</button><button type="submit" name="action_type" value="authorize_profile_change" class="py-4 bg-primary text-black font-headline font-black text-[10px] uppercase tracking-widest hover:opacity-80 transition-all rounded-sm italic">Commit_Authorized_Mod</button>
-                        </form>
+                    <div class="bg-black/20 p-8 rounded-sm text-center italic opacity-40">
+                        <p class="text-[9px] font-headline font-bold uppercase tracking-widest">Active Mutation in progress...</p>
+                        <p class="text-[10px] mt-2 font-headline">Please resolve the pending verification at the top of the dossier.</p>
                     </div>
                 <?php else: ?>
                     <div class="space-y-4">

@@ -124,7 +124,7 @@ include 'includes/header.php';
             VERIFICATION_QUEUE <span class="bg-black/20 px-2 py-0.5 rounded-sm min-w-[20px] text-center"><?= $verif_count ?></span>
         </a>
         <a href="?tab=changes" class="px-8 py-3 text-[10px] font-headline font-bold uppercase tracking-widest transition-all <?= $activeTab == 'changes' ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-on-surface-variant hover:text-white' ?> rounded-sm flex items-center gap-3">
-            CHANGE_REQUESTS <span class="bg-black/20 px-2 py-0.5 rounded-sm min-w-[20px] text-center"><?= $change_count ?></span>
+            PROFILE_REQUESTS <span class="<?= $change_count > 0 ? 'bg-error text-white' : 'bg-black/20' ?> px-2 py-0.5 rounded-sm min-w-[20px] text-center"><?= $change_count ?></span>
         </a>
     </div>
 
@@ -216,13 +216,9 @@ include 'includes/header.php';
                                 <?php endif; ?>
                             </td>
                             <td class="px-8 py-4 text-right">
-                                <form method="POST" class="flex justify-end gap-2">
-                                    <input type="hidden" name="handle_change_request" value="1">
-                                    <input type="hidden" name="request_id" value="<?= $r['request_id'] ?>">
-                                    <input type="hidden" name="customer_id" value="<?= $r['customer_id'] ?>">
-                                    <button name="action_type" value="reject" class="p-2 border border-error/20 text-error hover:bg-error hover:text-black transition-all rounded-sm"><span class="material-symbols-outlined text-[18px]">close</span></button>
-                                    <button name="action_type" value="approve" class="px-6 py-2 bg-primary text-black font-headline font-black text-[10px] uppercase tracking-widest hover:opacity-80 transition-all rounded-sm">COMMIT_DATA</button>
-                                </form>
+                                <a href="view_customer.php?id=<?= $r['customer_id'] ?>" class="inline-flex items-center gap-2 px-6 py-2 bg-primary text-black font-headline font-black text-[10px] uppercase tracking-widest hover:opacity-80 transition-all rounded-sm">
+                                    <span class="material-symbols-outlined text-[14px]">visibility</span> VIEW_DOSSIER
+                                </a>
                             </td>
                         </tr>
                         <?php endforeach; if(empty($changeRequests)): ?>
