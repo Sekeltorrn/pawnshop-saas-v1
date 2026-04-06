@@ -1,4 +1,4 @@
-<?php
+<?php ob_start();
 // Enable error reporting for development
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -415,3 +415,4 @@ try {
 </script>
 
 <?php include 'includes/footer.php'; ?>
+<?php ob_end_flush(); ?>
