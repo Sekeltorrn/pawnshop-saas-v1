@@ -1,4 +1,7 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+
 // api/get_tickets.php (PRODUCTION)
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -54,7 +57,7 @@ try {
             'maturity_date' => null,
             'expiration_date' => null,
             'inventory' => [
-                'item_name' => !empty(trim($loan['item_name'])) ? trim($loan['item_name']) : 'Vault Item'
+                'item_name' => !empty($loan['item_name']) ? trim((string)$loan['item_name']) : 'Vault Item'
             ]
         ];
     }
@@ -64,9 +67,14 @@ try {
     $status_label = ucfirst($status);
     $response['message'] = count($formatted_tickets) > 0 ? "$status_label tickets synchronized." : "No $status tickets found.";
 
-} catch (PDOException $e) {
-    // This will force the API to spit out the raw, exact database error!
-    $response['message'] = 'System Error: ' . $e->getMessage();
+} catch (Throwable $e) {
+    // This will force the API to spit out the raw, exact database error in JSON!
+    echo json_encode([
+        'success' => false, 
+        'tickets' => [], 
+        'message' => 'System/DB Error: ' . $e->getMessage()
+    ]);
+    exit;
 }
 
 error_log("GET_MY_TICKETS_OUTPUT: " . json_encode($response));
