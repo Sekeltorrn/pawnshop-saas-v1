@@ -71,10 +71,33 @@ try {
             $stmt->execute([$reason, $customer_id]);
             $msg = "Identity Protocol: REJECTED & RESET";
         } elseif ($action === 'approve') {
-            // Simplified Approval to verify existing KYC data
-            $stmt = $pdo->prepare("UPDATE customers SET status = 'verified', updated_at = NOW() WHERE customer_id = ?");
-            $stmt->execute([$customer_id]);
-            $msg = "Identity Protocol: VERIFIED";
+            try {
+                $stmt = $pdo->prepare("UPDATE customers SET 
+                    first_name = :fname,
+                    middle_name = :mname,
+                    last_name = :lname,
+                    contact_no = :phone,
+                    address = :addr,
+                    birthday = :dob,
+                    status = 'verified',
+                    updated_at = CURRENT_TIMESTAMP 
+                    WHERE customer_id = :id");
+
+                $stmt->execute([
+                    ':fname' => $_POST['first_name'] ?? '',
+                    ':mname' => $_POST['middle_name'] ?? '',
+                    ':lname' => $_POST['last_name'] ?? '',
+                    ':phone' => $_POST['contact_no'] ?? '',
+                    ':addr'  => $_POST['address'] ?? '',
+                    ':dob'   => $_POST['birthday'] ?? '',
+                    ':id'    => $customer_id
+                ]);
+
+                header("Location: view_customer.php?id=$customer_id&status=approved");
+                exit();
+            } catch (PDOException $e) {
+                die("AUTHORIZATION_CRITICAL_FAILURE: " . $e->getMessage());
+            }
         } elseif ($action === 'save_fields') {
             // New action for manual dossier updates
             $stmt = $pdo->prepare("UPDATE customers SET first_name=?, middle_name=?, last_name=?, email=?, contact_no=?, birthday=?, address=?, id_type=?, id_number=? WHERE customer_id=?");
@@ -182,7 +205,18 @@ try {
                     <div class="space-y-2"><label class="text-[9px] font-headline font-bold text-tertiary-dim uppercase tracking-widest opacity-40">Serial_ID_Hash</label><input type="text" name="id_number" value="<?= htmlspecialchars($customer['id_number'] ?? '') ?>" class="w-full bg-surface-container-lowest border border-tertiary-dim/20 p-4 text-tertiary-dim text-[12px] font-headline font-black uppercase outline-none text-center"></div>
                 </div>
 
-                <input type="hidden" name="middle_name" value="<?= htmlspecialchars($customer['middle_name'] ?? '') ?>"><input type="hidden" name="birthday" value="<?= htmlspecialchars($customer['birthday'] ?? '') ?>">
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-primary font-bold uppercase tracking-widest">Middle Name</label>
+                        <input type="text" name="middle_name" value="<?php echo htmlspecialchars($customer['middle_name'] ?? ''); ?>" 
+                               class="w-full bg-surface-container-highest border border-outline-variant p-3 text-xs font-mono text-on-surface focus:outline-none focus:border-primary">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-primary font-bold uppercase tracking-widest">Date of Birth</label>
+                        <input type="date" name="birthday" value="<?php echo htmlspecialchars($customer['birthday'] ?? ''); ?>" 
+                               class="w-full bg-surface-container-highest border border-outline-variant p-3 text-xs font-mono text-on-surface focus:outline-none focus:border-primary">
+                    </div>
+                </div>
 
                 <div class="pt-6">
                     <?php if (empty($customer['id_photo_front_url'])): ?>

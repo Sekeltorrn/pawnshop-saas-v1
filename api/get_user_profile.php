@@ -16,7 +16,7 @@ try {
     $pdo->exec("SET search_path TO \"$tenant_schema\", public;");
 
     // konsolidasyon nan tout done profile ak kyc
-    $stmt = $pdo->prepare("SELECT first_name, middle_name, last_name, email, contact_no, address, status, id_photo_front_url, id_photo_back_url, rejection_reason FROM customers WHERE customer_id = ?");
+    $stmt = $pdo->prepare("SELECT first_name, middle_name, last_name, email, contact_no, address, birthday, status, id_photo_front_url, id_photo_back_url, rejection_reason FROM customers WHERE customer_id = ?");
     $stmt->execute([$customer_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -45,6 +45,7 @@ try {
         'address' => (string)($user['address'] ?? ''),
         'email' => (string)$user['email'],
         'contact_no' => (string)$user['contact_no'],
+        'birthday' => (string)($user['birthday'] ?? ''),
         'id_photo_front_url' => $user['id_photo_front_url'],
         'id_photo_back_url' => $user['id_photo_back_url'],
         'rejection_reason' => $user['rejection_reason']
