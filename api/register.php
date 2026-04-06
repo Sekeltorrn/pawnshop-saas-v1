@@ -29,75 +29,71 @@ if (empty($email) || empty($password) || empty($schemaName)) {
     exit();
 }
 
-// 3. SECURE PASSWORD HASHING
-// We hash the password NOW because this is the only time we see the raw text.
-// verify.php will pull this hash from Supabase metadata and save it to your DB.
-$hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-
-// 4. Secure Credentials from Render Environment Variables
-$supabase_url = getenv('SUPABASE_URL'); 
-$api_key      = getenv('SUPABASE_ANON_KEY');
-
-// 5. Build Payload
-// We "stash" the hashed password in the metadata so it survives until verification.
-$payload = json_encode([
-    'email'    => $email,
-    'password' => $password,
-    'data'     => [
-        'full_name'     => $fullName,
-        'phone_number'  => $phone,
-        'schema_name'   => $schemaName,
-        'password_hash' => $hashedPassword, // THE KEY FOR LOGIN SUCCESS
-        'role'          => 'mobile_customer'
-    ]
-]);
-
-// 6. Initialize cURL to Supabase Auth Signup
-$ch = curl_init($supabase_url . '/auth/v1/signup');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'apikey: ' . $api_key,
-    'Content-Type: application/json'
-]);
-
-$response = curl_exec($ch);
-$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$error     = curl_error($ch);
-curl_close($ch);
-
-// 7. Response Handling
-if ($error) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Connection Error: $error"]);
+// Strict Schema Validation (Prevent SQL Injection on search_path)
+if (!preg_match('/^[a-zA-Z0-9_]+$/', $schemaName)) {
+    http_response_code(400);
+    echo json_encode([
+        "status" => "error", 
+        "message" => "Invalid shop schema format."
+    ]);
     exit();
 }
 
-$result = json_decode($response, true);
 
-if ($http_code == 200 || $http_code == 201) {
-    
-    // Check if user already exists in Supabase Auth
-    if (isset($result['identities']) && empty($result['identities'])) {
+// Database Connection
+$host     = getenv('DB_HOST'); 
+$db_name  = getenv('DB_NAME');
+$username = getenv('DB_USER');
+$password_env = getenv('DB_PASS');
+$port     = getenv('DB_PORT') ?: "5432";
+
+try {
+    $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$db_name", $username, $password_env);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(["status" => "error", "message" => "Database connection failed."]);
+    exit();
+}
+
+// Prepare User Data
+$hashed_password = password_hash($password, PASSWORD_DEFAULT);
+$name_parts = explode(' ', $fullName, 2);
+$first_name = $name_parts[0];
+$last_name  = isset($name_parts[1]) ? $name_parts[1] : '';
+
+try {
+    $pdo->exec("SET search_path TO \"$schemaName\", public;");
+
+    // Check if email already exists
+    $checkStmt = $pdo->prepare("SELECT customer_id FROM customers WHERE email = ?");
+    $checkStmt->execute([$email]);
+    if ($checkStmt->fetch()) {
         http_response_code(400);
-        echo json_encode([
-            "status" => "error", 
-            "message" => "This email is already registered. Please login instead."
-        ]);
-    } else {
-        // SUCCESS: OTP is sent. Database insert happens in verify.php
-        echo json_encode([
-            "status"  => "success", 
-            "message" => "Verification code sent to $email"
-        ]);
+        echo json_encode(["status" => "error", "message" => "This email is already registered. Please login instead."]);
+        exit();
     }
-} else {
-    $msg = $result['error_description'] ?? $result['msg'] ?? 'Registration failed';
-    http_response_code($http_code);
-    echo json_encode([
-        "status"  => "error",
-        "message" => "Supabase Error: " . $msg
+
+    // Insert new user directly
+    $stmt = $pdo->prepare("INSERT INTO customers (auth_user_id, first_name, last_name, email, contact_no, password, is_walk_in, status) 
+                           VALUES (gen_random_uuid(), :fname, :lname, :email, :phone, :pass, FALSE, 'unverified')
+                           RETURNING customer_id");
+    
+    $stmt->execute([
+        ':fname'   => $first_name,
+        ':lname'   => $last_name,
+        ':email'   => $email,
+        ':phone'   => $phone,
+        ':pass'    => $hashed_password, 
     ]);
+
+    echo json_encode([
+        "status" => "success",
+        "message" => "Registration successful! You can now log in."
+    ]);
+
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]);
 }
 ?>
