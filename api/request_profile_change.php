@@ -16,6 +16,15 @@ if (!$customer_id || !$tenant_schema) {
 
 try {
     $pdo->exec("SET search_path TO \"$tenant_schema\"");
+    
+    // CHECK FOR EXISTING PENDING REQUEST
+    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM profile_change_requests WHERE customer_id = ? AND status = 'pending'");
+    $checkStmt->execute([$customer_id]);
+    if ($checkStmt->fetchColumn() > 0) {
+        echo json_encode(['success' => false, 'message' => 'Another profile request change is ongoing. Please wait for staff approval.']);
+        exit;
+    }
+
     $stmt = $pdo->prepare("INSERT INTO profile_change_requests 
         (customer_id, requested_email, requested_contact_no, requested_address, status, created_at) 
         VALUES (?, ?, ?, ?, 'pending', NOW())");
@@ -23,6 +32,6 @@ try {
 
     echo json_encode(['success' => true, 'message' => 'Change request submitted for approval.']);
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Request failed.']);
+    echo json_encode(['success' => false, 'message' => 'Request failed: ' . $e->getMessage()]);
 }
 ?>

@@ -25,23 +25,22 @@ try {
         exit;
     }
 
-    // Check for pending profile change requests
-    $pending_stmt = $pdo->prepare("SELECT requested_email, requested_contact_no, requested_address FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' ORDER BY created_at DESC LIMIT 1");
-    $pending_stmt->execute([$customer_id]);
-    $pending_request = $pending_stmt->fetch(PDO::FETCH_ASSOC);
-
     $pending_fields = [];
-    if ($pending_request) {
-        if (!empty($pending_request['requested_email'])) {
-            $user['email'] = $pending_request['requested_email'];
+    $reqStmt = $pdo->prepare("SELECT * FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' LIMIT 1");
+    $reqStmt->execute([$customer_id]);
+    $pending = $reqStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($pending) {
+        if ($pending['requested_email']) {
+            $user['email'] = $pending['requested_email'];
             $pending_fields[] = 'email';
         }
-        if (!empty($pending_request['requested_contact_no'])) {
-            $user['contact_no'] = $pending_request['requested_contact_no'];
+        if ($pending['requested_contact_no']) {
+            $user['contact_no'] = $pending['requested_contact_no'];
             $pending_fields[] = 'contact_no';
         }
-        if (!empty($pending_request['requested_address'])) {
-            $user['address'] = $pending_request['requested_address'];
+        if ($pending['requested_address']) {
+            $user['address'] = $pending['requested_address'];
             $pending_fields[] = 'address';
         }
     }
