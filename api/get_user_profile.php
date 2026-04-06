@@ -25,27 +25,29 @@ try {
         exit;
     }
 
+    // 1. Check for Pending Profile Change Requests
     $pending_fields = [];
-    $reqStmt = $pdo->prepare("SELECT * FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' LIMIT 1");
+    $reqStmt = $pdo->prepare("SELECT requested_email, requested_contact_no, requested_address FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' LIMIT 1");
     $reqStmt->execute([$customer_id]);
     $pending = $reqStmt->fetch(PDO::FETCH_ASSOC);
 
     if ($pending) {
-        if ($pending['requested_email']) {
+        // If a field is pending, overwrite the current value so the app shows the "New" data
+        if (!empty($pending['requested_email'])) {
             $user['email'] = $pending['requested_email'];
             $pending_fields[] = 'email';
         }
-        if ($pending['requested_contact_no']) {
+        if (!empty($pending['requested_contact_no'])) {
             $user['contact_no'] = $pending['requested_contact_no'];
             $pending_fields[] = 'contact_no';
         }
-        if ($pending['requested_address']) {
+        if (!empty($pending['requested_address'])) {
             $user['address'] = $pending['requested_address'];
             $pending_fields[] = 'address';
         }
     }
 
-    // derived status logic mirrored from dashboard
+    // 2. Derived status logic mirrored from dashboard
     $raw_status = $user['status'] ?? 'unverified';
     $derived_status = 'unverified';
     if ($raw_status === 'verified' || $raw_status === 'approved') {
@@ -56,6 +58,7 @@ try {
         $derived_status = 'rejected';
     }
 
+    // 3. Consolidated Response
     echo json_encode([
         'success' => true,
         'kyc_status' => (string)$derived_status,
@@ -66,13 +69,13 @@ try {
         'email' => (string)$user['email'],
         'contact_no' => (string)$user['contact_no'],
         'birthday' => (string)($user['birthday'] ?? ''),
+        'pending_fields' => $pending_fields, 
         'id_photo_front_url' => $user['id_photo_front_url'],
         'id_photo_back_url' => $user['id_photo_back_url'],
-        'rejection_reason' => $user['rejection_reason'],
-        'pending_fields' => $pending_fields
+        'rejection_reason' => $user['rejection_reason']
     ]);
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'API Error: ' . $e->getMessage()]);
 }
 ?>
