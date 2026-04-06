@@ -71,33 +71,16 @@ try {
             $stmt->execute([$reason, $customer_id]);
             $msg = "Identity Protocol: REJECTED & RESET";
         } elseif ($action === 'approve') {
-            try {
-                $stmt = $pdo->prepare("UPDATE customers SET 
-                    first_name = :fname,
-                    middle_name = :mname,
-                    last_name = :lname,
-                    contact_no = :phone,
-                    address = :addr,
-                    birthday = :dob,
-                    status = 'verified',
-                    updated_at = CURRENT_TIMESTAMP 
-                    WHERE customer_id = :id");
-
-                $stmt->execute([
-                    ':fname' => $_POST['first_name'] ?? '',
-                    ':mname' => $_POST['middle_name'] ?? '',
-                    ':lname' => $_POST['last_name'] ?? '',
-                    ':phone' => $_POST['contact_no'] ?? '',
-                    ':addr'  => $_POST['address'] ?? '',
-                    ':dob'   => $_POST['birthday'] ?? '',
-                    ':id'    => $customer_id
-                ]);
-
-                header("Location: view_customer.php?id=$customer_id&status=approved");
-                exit();
-            } catch (PDOException $e) {
-                die("AUTHORIZATION_CRITICAL_FAILURE: " . $e->getMessage());
-            }
+            $stmt = $pdo->prepare("UPDATE customers SET 
+                first_name = ?, middle_name = ?, last_name = ?, 
+                contact_no = ?, address = ?, birthday = ?, status = 'verified' 
+                WHERE customer_id = ?");
+            $stmt->execute([
+                $_POST['first_name'], $_POST['middle_name'], $_POST['last_name'],
+                $_POST['contact_no'], $_POST['address'], $_POST['birthday'], $customer_id
+            ]);
+            header("Location: view_customer.php?id=$customer_id&status=approved");
+            exit();
         } elseif ($action === 'save_fields') {
             // New action for manual dossier updates
             $stmt = $pdo->prepare("UPDATE customers SET first_name=?, middle_name=?, last_name=?, email=?, contact_no=?, birthday=?, address=?, id_type=?, id_number=? WHERE customer_id=?");
@@ -189,8 +172,16 @@ try {
                 <div class="flex items-center gap-3 border-b border-outline-variant/10 pb-6 opacity-40"><span class="material-symbols-outlined text-primary text-lg">person</span><h3 class="text-[10px] font-headline font-bold text-on-surface uppercase tracking-widest italic">Core_Identity_Cluster</h3></div>
                 
                 <div class="grid grid-cols-2 gap-6">
-                    <div class="space-y-2"><label class="text-[9px] font-headline font-bold text-on-surface-variant uppercase tracking-widest opacity-40">First Name</label><input type="text" name="first_name" required value="<?= htmlspecialchars($customer['first_name'] ?? '') ?>" class="w-full bg-surface-container-lowest border border-outline-variant/20 p-4 text-on-surface text-[12px] font-headline font-black uppercase outline-none focus:border-primary/50"></div>
-                    <div class="space-y-2"><label class="text-[9px] font-headline font-bold text-on-surface-variant uppercase tracking-widest opacity-40">Last Name</label><input type="text" name="last_name" required value="<?= htmlspecialchars($customer['last_name'] ?? '') ?>" class="w-full bg-surface-container-lowest border border-outline-variant/20 p-4 text-on-surface text-[12px] font-headline font-black uppercase outline-none focus:border-primary/50"></div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-primary font-bold uppercase tracking-widest">First Name</label>
+                        <input type="text" name="first_name" required value="<?php echo htmlspecialchars($customer['first_name'] ?? ''); ?>" 
+                               class="w-full bg-surface-container-highest border border-outline-variant p-3 text-xs font-mono text-on-surface focus:outline-none focus:border-primary">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-primary font-bold uppercase tracking-widest">Last Name</label>
+                        <input type="text" name="last_name" required value="<?php echo htmlspecialchars($customer['last_name'] ?? ''); ?>" 
+                               class="w-full bg-surface-container-highest border border-outline-variant p-3 text-xs font-mono text-on-surface focus:outline-none focus:border-primary">
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-6">
