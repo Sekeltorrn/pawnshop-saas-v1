@@ -68,7 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt_status->execute([$customer_id]);
             $cust_status = $stmt_status->fetchColumn();
 
-            if ($cust_status !== 'verified') {
+            // Make the check case-insensitive and ignore trailing spaces
+            if (strtolower(trim($cust_status)) !== 'verified') {
                 throw new Exception("Action Denied: Customer identity is unverified. Please approve their KYC documents in the Customer Hub first.");
             }
         }

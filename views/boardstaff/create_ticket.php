@@ -45,7 +45,10 @@ $service_fee = $sys_settings['service_fee'] ?? 5.00;
 // 3. FETCH VERIFIED CUSTOMERS
 $customer_data = [];
 try {
-    $stmt = $pdo->query("SELECT customer_id, first_name, last_name, contact_no FROM customers ORDER BY last_name ASC");
+    $stmt = $pdo->query("SELECT customer_id, first_name, last_name, contact_no 
+                         FROM customers 
+                         WHERE LOWER(TRIM(status)) = 'verified' 
+                         ORDER BY last_name ASC, first_name ASC");
     while($c = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $customer_data[$c['customer_id']] = [
             'name'      => $c['first_name'] . ' ' . $c['last_name'],
@@ -91,7 +94,7 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         <div class="lg:col-span-8 space-y-8">
                 
             <!-- CUSTOMER IDENTITY SECTION -->
-            <div class="bg-surface-container-low p-10 border border-outline-variant/10 relative overflow-hidden group rounded-sm shadow-xl">
+            <div class="bg-surface-container-low p-10 border border-outline-variant/10 relative overflow-visible group rounded-sm shadow-xl">
                 <h3 class="text-on-surface font-headline font-bold mb-8 flex items-center gap-4 text-[12px] uppercase tracking-[0.3em] border-b border-outline-variant/10 pb-6 opacity-80">
                     <span class="material-symbols-outlined text-primary text-xl">person_search</span> Customer Identity :: SEC_VERIFY
                 </h3>
@@ -819,6 +822,22 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         if(el) el.addEventListener('input', calculate);
     });
     window.addEventListener('load', () => {
+        if (document.getElementById('customer_select')) {
+            const settings = {
+                create: false,
+                sortField: { field: "text", direction: "asc" },
+                placeholder: "-- SEARCH VERIFIED CLIENT DATABASE --",
+                allowEmptyOption: true,
+                onChange: function(value) {
+                    // This ensures your existing auto-fill logic still works
+                    if (typeof updateCustomerInfo === "function") {
+                        updateCustomerInfo();
+                    }
+                }
+            };
+            new TomSelect("#customer_select", settings);
+        }
+
         // 1. Restore Customer Context
         const custTypeInput = document.querySelector('input[name="customer_type"]:checked');
         if (custTypeInput) {
@@ -843,6 +862,82 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         // 4. Final Telemetry Recalculation
         calculate();
     });
-</script>
+</script><link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
+<style>
+    /* Surgical CSS to match your theme exactly */
+    .ts-wrapper.single .ts-control {
+        background-color: rgb(26, 28, 25) !important; /* bg-surface-container-highest */
+        border: 1px solid rgba(195, 199, 191, 0.2) !important; /* border-outline-variant/20 */
+        color: #e2e3de !important; /* text-on-surface */
+        padding: 1.25rem !important; /* p-5 */
+        font-family: 'headline', sans-serif !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        border-radius: 0.125rem;
+        box-shadow: none;
+        /* Fix for the ts-control height to match your p-5 requirement */
+        min-height: 58px !important;
+        display: flex;
+        align-items: center;
+    }
+
+    .ts-dropdown {
+        background-color: rgb(26, 28, 25) !important;
+        color: #e2e3de !important;
+        border: 1px solid rgba(195, 199, 191, 0.2) !important;
+        font-family: 'headline', sans-serif !important;
+        /* Force the dropdown to stay on top of EVERYTHING */
+        z-index: 9999 !important;
+        position: absolute !important;
+        min-width: 100%;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    .ts-dropdown .active {
+        background-color: rgba(0, 255, 65, 0.1) !important; /* Primary highlight */
+        color: #00ff41 !important;
+    }
+
+    .ts-dropdown .option {
+        padding: 12px 20px;
+        text-transform: uppercase;
+    }
+
+    /* Hide the default arrow to keep it clean */
+    .ts-wrapper.single .ts-control::after {
+        border-color: #00ff41 transparent transparent transparent !important;
+    }
+
+    /* Ensure the search wrapper has a higher hierarchy than the info card below it */
+    #existing_customer_view {
+        position: relative;
+        z-index: 50; /* Higher than other dashboard elements */
+    }
+
+    /* TARGET THE TYPED TEXT DIRECTLY */
+    .ts-wrapper .ts-control input {
+        color: #00ff41 !important; /* Neon Green Typeface */
+        background: transparent !important;
+        font-family: 'headline', sans-serif !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.1em !important;
+        width: 100% !important;
+    }
+
+    /* OPTIONAL: Make the placeholder slightly visible neon as well */
+    .ts-wrapper .ts-control input::placeholder {
+        color: rgba(0, 255, 65, 0.3) !important;
+        text-transform: uppercase;
+    }
+
+    /* Ensure the 'selected item' also matches the neon green once picked */
+    .ts-wrapper.single .ts-control .item {
+        color: #00ff41 !important;
+    }
+</style>
 
 <?php include 'includes/footer.php'; ?>
