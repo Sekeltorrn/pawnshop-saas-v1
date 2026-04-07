@@ -49,8 +49,21 @@ try {
                     $stmt->execute([$req_id]);
                     $req = $stmt->fetch(PDO::FETCH_ASSOC);
                     if ($req) {
-                        $stmt = $pdo->prepare("UPDATE customers SET email = ?, contact_no = ?, address = ?, updated_at = NOW() WHERE customer_id = ?");
-                        $stmt->execute([$req['requested_email'], $req['requested_contact_no'], $req['requested_address'], $customer_id]);
+                        $updateCustomerStmt = $pdo->prepare("
+                            UPDATE customers 
+                            SET 
+                                email = COALESCE(?, email),
+                                contact_no = COALESCE(?, contact_no),
+                                address = COALESCE(?, address),
+                                updated_at = NOW()
+                            WHERE customer_id = ?
+                        ");
+                        $updateCustomerStmt->execute([
+                            $req['requested_email'], 
+                            $req['requested_contact_no'], 
+                            $req['requested_address'], 
+                            $customer_id
+                        ]);
                         $stmt = $pdo->prepare("UPDATE profile_change_requests SET status = 'approved', admin_notes = 'Approved by Staff', updated_at = NOW() WHERE request_id = ?");
                         $stmt->execute([$req_id]);
                         $pdo->commit();
