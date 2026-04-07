@@ -2,6 +2,12 @@
 header('Content-Type: application/json');
 require_once '../config/db_connect.php'; 
 
+// ==========================================
+// DEVELOPER SETTINGS (The "Kill Switch")
+// ==========================================
+$ENFORCE_COOLDOWN = false; // SET TO FALSE WHILE TESTING, TRUE FOR PRODUCTION
+$COOLDOWN_HOURS = 24;      // Number of hours to lock the user out AFTER an employee approves/rejects
+
 $json_input = json_decode(file_get_contents('php://input'), true);
 $customer_id = $_POST['customer_id'] ?? $json_input['customer_id'] ?? null;
 $tenant_schema = $_POST['tenant_schema'] ?? $json_input['tenant_schema'] ?? null;
@@ -17,12 +23,31 @@ if (!$customer_id || !$tenant_schema) {
 try {
     $pdo->exec("SET search_path TO \"$tenant_schema\"");
     
-    // CHECK FOR EXISTING PENDING REQUEST
-    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM profile_change_requests WHERE customer_id = ? AND status = 'pending'");
+    // THE SMART LOCK: Check the latest request state and timestamp
+    $checkStmt = $pdo->prepare("SELECT status, updated_at FROM profile_change_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1");
     $checkStmt->execute([$customer_id]);
-    if ($checkStmt->fetchColumn() > 0) {
-        echo json_encode(['success' => false, 'message' => 'Another profile request change is ongoing. Please wait for staff approval.']);
-        exit;
+    $latestReq = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($latestReq) {
+        // 1. The Pending Lock (Always enforced)
+        if ($latestReq['status'] === 'pending') {
+            echo json_encode(['success' => false, 'message' => 'You already have a pending request. Please wait for staff approval.']);
+            exit;
+        }
+
+        // 2. The Cooldown Timer (Enforced only if developer switch is TRUE)
+        if ($ENFORCE_COOLDOWN && in_array($latestReq['status'], ['approved', 'rejected'])) {
+            // Calculate hours passed since the employee clicked the button
+            $last_update_time = strtotime($latestReq['updated_at']);
+            $current_time = time();
+            $hours_passed = ($current_time - $last_update_time) / 3600;
+
+            if ($hours_passed < $COOLDOWN_HOURS) {
+                $hours_left = ceil($COOLDOWN_HOURS - $hours_passed);
+                echo json_encode(['success' => false, 'message' => "To prevent spam, please wait $hours_left hour(s) before submitting another request."]);
+                exit;
+            }
+        }
     }
 
     // 1. Fetch the user's CURRENT data
