@@ -54,8 +54,9 @@ try {
     // Determine the final amount and description based on the intent
     if ($type === 'principal' && $custom_amount != null) {
         // PARTIAL PAYMENT LOGIC
-        $amount_to_pay = floatval($custom_amount);
-        $description = "Partial Payment for PT-$ticket_no";
+        // Add the mandatory renewal cost (interest + service) to the partial principal entered
+        $amount_to_pay = floatval($custom_amount) + $renewal_cost;
+        $description = "Partial Principal Payment (+ Interest) for PT-$ticket_no";
         $intent = 'PARTIAL';
     } else {
         // RENEWAL OR REDEMPTION LOGIC
