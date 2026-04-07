@@ -25,25 +25,30 @@ try {
         exit;
     }
 
-    // 1. Check for Pending Profile Change Requests
+    // 1. Check for the LATEST Profile Change Request
+    $latest_req_status = null;
+    $latest_req_id = null;
     $pending_fields = [];
-    $reqStmt = $pdo->prepare("SELECT request_id, requested_email, requested_contact_no, requested_address FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' LIMIT 1");
-    $reqStmt->execute([$customer_id]);
-    $pending = $reqStmt->fetch(PDO::FETCH_ASSOC);
+    $requested_fields = [];
 
-    if ($pending) {
-        // If a field is pending, overwrite the current value so the app shows the "New" data
-        if (!empty($pending['requested_email'])) {
-            $user['email'] = $pending['requested_email'];
-            $pending_fields[] = 'email';
-        }
-        if (!empty($pending['requested_contact_no'])) {
-            $user['contact_no'] = $pending['requested_contact_no'];
-            $pending_fields[] = 'contact_no';
-        }
-        if (!empty($pending['requested_address'])) {
-            $user['address'] = $pending['requested_address'];
-            $pending_fields[] = 'address';
+    $reqStmt = $pdo->prepare("SELECT request_id, status, requested_email, requested_contact_no, requested_address FROM profile_change_requests WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1");
+    $reqStmt->execute([$customer_id]);
+    $latest_req = $reqStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($latest_req) {
+        $latest_req_status = $latest_req['status'];
+        $latest_req_id = $latest_req['request_id'];
+
+        if (!empty($latest_req['requested_email'])) $requested_fields[] = 'email';
+        if (!empty($latest_req['requested_contact_no'])) $requested_fields[] = 'contact_no';
+        if (!empty($latest_req['requested_address'])) $requested_fields[] = 'address';
+
+        // Only overwrite the UI values if it is actively PENDING
+        if ($latest_req_status === 'pending') {
+            $pending_fields = $requested_fields;
+            if (!empty($latest_req['requested_email'])) $user['email'] = $latest_req['requested_email'];
+            if (!empty($latest_req['requested_contact_no'])) $user['contact_no'] = $latest_req['requested_contact_no'];
+            if (!empty($latest_req['requested_address'])) $user['address'] = $latest_req['requested_address'];
         }
     }
 
@@ -70,7 +75,9 @@ try {
         'contact_no' => (string)$user['contact_no'],
         'birthday' => (string)($user['birthday'] ?? ''),
         'pending_fields' => $pending_fields, 
-        'request_id' => $pending ? (string)$pending['request_id'] : null,
+        'requested_fields' => $requested_fields,
+        'latest_request_status' => $latest_req_status,
+        'latest_request_id' => $latest_req_id ? (string)$latest_req_id : null,
         'id_photo_front_url' => $user['id_photo_front_url'],
         'id_photo_back_url' => $user['id_photo_back_url'],
         'rejection_reason' => $user['rejection_reason']
