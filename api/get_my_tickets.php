@@ -33,7 +33,8 @@ try {
         SELECT 
             loans.pawn_ticket_no, 
             loans.reference_no, 
-            loans.principal_amount, 
+            loans.principal_amount,
+            loans.net_proceeds,
             loans.due_date, 
             loans.status,
             inventory.item_name
@@ -52,6 +53,7 @@ try {
             'pawn_ticket_no' => (int) $loan['pawn_ticket_no'],
             'reference_no' => $loan['reference_no'],
             'principal_amount' => (float) $loan['principal_amount'],
+            'net_proceeds' => (float) $loan['net_proceeds'],
             'due_date' => $loan['due_date'],
             'status' => $loan['status'],
             'maturity_date' => null,
