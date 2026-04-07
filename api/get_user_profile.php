@@ -27,7 +27,7 @@ try {
 
     // 1. Check for Pending Profile Change Requests
     $pending_fields = [];
-    $reqStmt = $pdo->prepare("SELECT requested_email, requested_contact_no, requested_address FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' LIMIT 1");
+    $reqStmt = $pdo->prepare("SELECT request_id, requested_email, requested_contact_no, requested_address FROM profile_change_requests WHERE customer_id = ? AND status = 'pending' LIMIT 1");
     $reqStmt->execute([$customer_id]);
     $pending = $reqStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -70,6 +70,7 @@ try {
         'contact_no' => (string)$user['contact_no'],
         'birthday' => (string)($user['birthday'] ?? ''),
         'pending_fields' => $pending_fields, 
+        'request_id' => $pending ? (string)$pending['request_id'] : null,
         'id_photo_front_url' => $user['id_photo_front_url'],
         'id_photo_back_url' => $user['id_photo_back_url'],
         'rejection_reason' => $user['rejection_reason']
