@@ -31,7 +31,14 @@ try {
     }
 
     $reference_number = $attributes['reference_number'];
-    $amount_paid_php = ($attributes['amount'] ?? 0) / 100;
+    
+    // THE FIX: Dig into PayMongo's nested arrays to find the actual amount paid
+    $raw_amount = $attributes['payments'][0]['attributes']['amount'] 
+               ?? $attributes['payment_intent']['attributes']['amount'] 
+               ?? $attributes['amount'] 
+               ?? 0;
+               
+    $amount_paid_php = $raw_amount / 100;
 
     $parts = explode('-', $reference_number);
     if (count($parts) < 4) { http_response_code(200); exit; }
