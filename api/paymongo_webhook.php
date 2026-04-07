@@ -45,7 +45,8 @@ try {
     $pdo->exec("SET search_path TO \"$tenant_schema\", public;");
 
     // FETCH OLD LOAN
-    $stmt = $pdo->prepare("SELECT * FROM loans WHERE pawn_ticket_no = ?");
+    // THE IRONCLAD PATCH: Force pawn_ticket_no to act as text to prevent webhook crashes
+    $stmt = $pdo->prepare("SELECT * FROM loans WHERE pawn_ticket_no::text = ?");
     $stmt->execute([$ticket_no_str]);
     $old_loan = $stmt->fetch(PDO::FETCH_ASSOC);
 

@@ -18,12 +18,22 @@ if (!$ticket_no || !$tenant_schema) {
 
 try {
     // 2. FETCH TICKET & CUSTOMER INFO
-    $pdo->exec("SET search_path TO \"$tenant_schema\"");
-    $stmt = $pdo->prepare("SELECT l.*, c.first_name, c.last_name, c.email, c.contact_no 
-                           FROM loans l 
-                           JOIN customers c ON l.customer_id = c.customer_id 
-                           WHERE l.pawn_ticket_no = ?");
-    $stmt->execute([str_replace('PT-', '', $ticket_no)]);
+    // Included public schema just in case the users table lives there
+    $pdo->exec("SET search_path TO \"$tenant_schema\", public;");
+    
+    // THE IRONCLAD PATCH: Force all IDs to act as text during the search
+    $stmt = $pdo->prepare("
+        SELECT l.*, c.first_name, c.last_name, c.email, c.contact_no 
+        FROM loans l 
+        JOIN customers c ON l.customer_id::text = c.customer_id::text 
+        WHERE l.pawn_ticket_no::text = ? OR l.loan_id::text = ?
+    ");
+    
+    // Clean the ticket number (removes 'PT-' if the app sent it by mistake)
+    $clean_ticket = str_replace('PT-', '', $ticket_no);
+    
+    // Execute twice to check against both the short ticket number and the long UUID
+    $stmt->execute([$clean_ticket, $clean_ticket]);
     $loan = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$loan) {
