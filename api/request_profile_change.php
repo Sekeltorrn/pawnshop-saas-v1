@@ -5,7 +5,7 @@ require_once '../config/db_connect.php';
 // ==========================================
 // DEVELOPER SETTINGS (The "Kill Switch")
 // ==========================================
-$ENFORCE_COOLDOWN = false; // SET TO FALSE WHILE TESTING, TRUE FOR PRODUCTION
+$ENFORCE_COOLDOWN = true; // SET TO FALSE WHILE TESTING, TRUE FOR PRODUCTION
 $COOLDOWN_HOURS = 24;      // Number of hours to lock the user out AFTER an employee approves/rejects
 
 $json_input = json_decode(file_get_contents('php://input'), true);
