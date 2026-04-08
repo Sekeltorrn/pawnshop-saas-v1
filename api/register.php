@@ -87,9 +87,37 @@ try {
         ':pass'    => $hashed_password, 
     ]);
 
+    // ==============================================================
+    // NEW: AUTOMATICALLY TRIGGER SUPABASE REGISTRATION OTP
+    // ==============================================================
+    $supabase_url = getenv('SUPABASE_URL'); 
+    $api_key      = getenv('SUPABASE_ANON_KEY');
+
+    if ($supabase_url && $api_key) {
+        $payload = json_encode([
+            'email'       => $email,
+            'create_user' => true // Tells Supabase this is a new registration
+        ]);
+
+        $ch = curl_init($supabase_url . '/auth/v1/otp');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'apikey: ' . $api_key,
+            'Content-Type: application/json'
+        ]);
+        
+        // Execute request silently in the background
+        curl_exec($ch);
+        curl_close($ch);
+    }
+    // ==============================================================
+
+    // Return the updated success message
     echo json_encode([
         "status" => "success",
-        "message" => "Registration successful! You can now log in."
+        "message" => "Account created! A verification code has been sent to your email."
     ]);
 
 } catch (PDOException $e) {
