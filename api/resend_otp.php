@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(); }
 
 $json_input = json_decode(file_get_contents('php://input'), true);
 $email = $_POST['email'] ?? $json_input['email'] ?? '';
-$type  = $_POST['type'] ?? $json_input['type'] ?? 'signup'; // 'signup' or 'login'
+$type  = $_POST['type'] ?? $json_input['type'] ?? 'signup'; 
 
 if (empty($email)) {
     http_response_code(400);
@@ -20,15 +20,24 @@ if (empty($email)) {
 $supabase_url = getenv('SUPABASE_URL'); 
 $api_key      = getenv('SUPABASE_ANON_KEY');
 
-// Map 'login' to 'magiclink' for Supabase, 'signup' stays 'signup'
-$supabase_type = ($type === 'login') ? 'magiclink' : 'signup';
+// 1. DYNAMIC ROUTING FOR SUPABASE
+if ($type === 'login') {
+    // Logins use the OTP endpoint to trigger the Magic Link/Login template
+    $url = $supabase_url . '/auth/v1/otp';
+    $payload = json_encode([
+        'email' => $email,
+        'create_user' => false
+    ]);
+} else {
+    // Signups use the Resend endpoint to trigger the Confirm Signup template
+    $url = $supabase_url . '/auth/v1/resend';
+    $payload = json_encode([
+        'email' => $email,
+        'type'  => 'signup'
+    ]);
+}
 
-$payload = json_encode([
-    'email' => $email,
-    'type'  => $supabase_type
-]);
-
-$ch = curl_init($supabase_url . '/auth/v1/resend');
+$ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
@@ -46,6 +55,6 @@ if ($http_code == 200) {
 } else {
     $result = json_decode($response, true);
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => $result['msg'] ?? "Could not resend code."]);
+    echo json_encode(["status" => "error", "message" => $result['msg'] ?? $result['error_description'] ?? "Could not resend code."]);
 }
 ?>
