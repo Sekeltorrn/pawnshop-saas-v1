@@ -28,43 +28,43 @@ if (empty($email) || empty($code)) {
 $supabase_url = getenv('SUPABASE_URL');
 $api_key      = getenv('SUPABASE_ANON_KEY');
 
-// 4. Logic: Verify Code with Supabase
-$payload = json_encode([
-    'type'  => 'signup',
-    'email' => $email,
-    'token' => $code
-]);
-
-$ch = curl_init($supabase_url . '/auth/v1/verify');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'apikey: ' . $api_key,
-    'Content-Type: application/json'
-]);
-
-$response = curl_exec($ch);
-$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$error = curl_error($ch);
-curl_close($ch);
-
-// 5. Output Handling
-if ($error) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Supabase connection error: $error"]);
-    exit();
+// 4. THE IRONCLAD PATCH: Supabase Type-Swap Fallback
+function verifySupabaseToken($supabase_url, $api_key, $email, $code, $type) {
+    $payload = json_encode(['type' => $type, 'email' => $email, 'token' => $code]);
+    $ch = curl_init($supabase_url . '/auth/v1/verify');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'apikey: ' . $api_key,
+        'Content-Type: application/json'
+    ]);
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return ['code' => $http_code, 'response' => $response];
 }
 
-if ($http_code === 200) {
-    echo json_encode(["status" => "success", "message" => "Verified"]);
+// Attempt 1: Try as a 'signup' token
+$result = verifySupabaseToken($supabase_url, $api_key, $email, $code, 'signup');
+
+// Attempt 2: If Supabase says invalid (usually 400 or 401), try as a 'magiclink' token
+if ($result['code'] >= 400) {
+    $result = verifySupabaseToken($supabase_url, $api_key, $email, $code, 'magiclink');
+}
+
+$decoded_response = json_decode($result['response'], true);
+
+// 5. Output Handling
+if ($result['code'] == 200 && isset($decoded_response['access_token'])) {
+    http_response_code(200);
+    echo json_encode(["status" => "success", "message" => "Email verified successfully."]);
 } else {
-    $result = json_decode($response, true);
-    http_response_code($http_code ?: 400);
+    $msg = $decoded_response['error_description'] ?? $decoded_response['msg'] ?? 'Invalid code.';
+    http_response_code($result['code'] ?: 401);
     echo json_encode([
-        "status" => "error",
-        "message" => "Invalid code",
-        "debug" => $result['error_description'] ?? $result['msg'] ?? "Verification failed"
+        "status" => "error", 
+        "message" => "Verification failed: " . $msg
     ]);
 }
 ?>
