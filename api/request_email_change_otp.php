@@ -1,81 +1,49 @@
 <?php
-/**
- * api/request_email_change_otp.php
- * Secure proxy between the mobile app and Supabase Auth API
- * to initiate an email change request by sending an OTP.
- */
-
-// Step 1: CORS Headers and Content-Type configuration
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, PUT, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization");
 header("Content-Type: application/json; charset=UTF-8");
 
-// Handle preflight OPTIONS request
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { exit(); }
 
-// Step 2: Retrieve JSON payload from php://input
-$input = json_decode(file_get_contents("php://input"), true);
-$new_email = $input['new_email'] ?? null;
-$access_token = $input['access_token'] ?? null;
+$json_input = json_decode(file_get_contents('php://input'), true);
+$new_email = $_POST['new_email'] ?? $json_input['new_email'] ?? '';
+$access_token = $_POST['access_token'] ?? $json_input['access_token'] ?? ''; // Required by Supabase!
 
-// Validation: Return 400 if fields are missing
-if (!$new_email || !$access_token) {
+if (empty($new_email) || empty($access_token)) {
     http_response_code(400);
-    echo json_encode([
-        "error" => "bad_request",
-        "message" => "Missing 'new_email' or 'access_token' in JSON payload."
-    ]);
+    echo json_encode(["status" => "error", "message" => "New email and user access token are required."]);
     exit();
 }
 
-// Step 3: Configuration from Environment Variables
 $supabase_url = getenv('SUPABASE_URL');
 $supabase_key = getenv('SUPABASE_ANON_KEY');
 
-if (!$supabase_url || !$supabase_key) {
-    http_response_code(500);
-    echo json_encode([
-        "error" => "server_error",
-        "message" => "Supabase environment variables are not configured."
-    ]);
-    exit();
-}
+$payload = json_encode([
+    "email" => $new_email
+]);
 
-// Prepare Supabase Endpoint: PUT {SUPABASE_URL}/auth/v1/user
-$url = rtrim($supabase_url, '/') . '/auth/v1/user';
-
-// Step 4: Execute cURL Proxy Request
-$ch = curl_init($url);
-
+// Notice this is a PUT request to /user, not /otp
+$ch = curl_init("$supabase_url/auth/v1/user");
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT");
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(["email" => $new_email]));
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PUT"); // Required for user updates
+curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'apikey: ' . $supabase_key,
-    'Authorization: Bearer ' . $access_token,
-    'Content-Type: application/json'
+    "apikey: $supabase_key",
+    "Authorization: Bearer $access_token",
+    "Content-Type: application/json"
 ]);
 
 $response = curl_exec($ch);
-$http_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
 
-// Handle unreachable API or execution error
-if (curl_errno($ch)) {
+if (!$response) {
     http_response_code(500);
-    echo json_encode([
-        "error" => "curl_error",
-        "message" => "Could not reach Supabase API: " . curl_error($ch)
-    ]);
-    curl_close($ch);
+    echo json_encode(["status" => "error", "message" => "Supabase API did not respond."]);
     exit();
 }
 
-curl_close($ch);
-
-// Step 5: Return Supabase's exact JSON and HTTP status code
-http_response_code($http_status);
-echo $response;
+http_response_code($http_code);
+echo $response; 
+?>
