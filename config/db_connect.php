@@ -47,9 +47,12 @@ $dsn = "pgsql:host=$host;port=$port;dbname=$dbname";
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES => false,
-    PDO::ATTR_TIMEOUT => 10, // Wait up to 10 seconds per knock
-    PDO::ATTR_PERSISTENT => false // NEVER use persistent connections with Supabase 6543
+    
+    // THE MAGIC FIX FOR PORT 6543: Must be TRUE for Supabase Connection Poolers
+    PDO::ATTR_EMULATE_PREPARES => true, 
+    
+    PDO::ATTR_TIMEOUT => 10, 
+    PDO::ATTR_PERSISTENT => false 
 ];
 
 $max_attempts = 3;
