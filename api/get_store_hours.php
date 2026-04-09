@@ -29,9 +29,9 @@ try {
     $settings = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($settings) {
-        // Format times to H:i (e.g., "08:00")
-        $open_time = $settings['store_open_time'] ? date("H:i", strtotime($settings['store_open_time'])) : "08:00";
-        $close_time = $settings['store_close_time'] ? date("H:i", strtotime($settings['store_close_time'])) : "17:00";
+        // Format times to h:i A (e.g., "08:00 AM") for Android compatibility
+        $open_time = $settings['store_open_time'] ? date("h:i A", strtotime($settings['store_open_time'])) : "08:00 AM";
+        $close_time = $settings['store_close_time'] ? date("h:i A", strtotime($settings['store_close_time'])) : "05:00 PM";
         
         // Decode closed_days from JSONB (PostgreSQL)
         $closed_days = json_decode($settings['closed_days'], true) ?: [];
@@ -49,8 +49,8 @@ try {
         echo json_encode([
             "status" => "success",
             "data" => [
-                "store_open_time" => "08:00",
-                "store_close_time" => "17:00",
+                "store_open_time" => "08:00 AM",
+                "store_close_time" => "05:00 PM",
                 "closed_days" => ["Sunday"]
             ]
         ]);
