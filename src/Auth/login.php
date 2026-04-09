@@ -93,29 +93,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $all_schemas = $stmt_schemas->fetchAll(PDO::FETCH_COLUMN);
 
         foreach ($all_schemas as $schema) {
-            // Safely query the employees table in the current schema
-            $query = "SELECT * FROM \"$schema\".employees WHERE email = :email AND status = 'active' LIMIT 1";
-            $stmt_emp = $pdo->prepare($query);
-            $stmt_emp->execute(['email' => $email]);
-            $employee = $stmt_emp->fetch(PDO::FETCH_ASSOC);
+            // THE SAFETY NET: Wrapped the interior of the loop in a try/catch
+            try {
+                // Safely query the employees table in the current schema
+                $query = "SELECT * FROM \"$schema\".employees WHERE email = :email AND status = 'active' LIMIT 1";
+                $stmt_emp = $pdo->prepare($query);
+                $stmt_emp->execute(['email' => $email]);
+                $employee = $stmt_emp->fetch(PDO::FETCH_ASSOC);
 
-            if ($employee && password_verify($password, $employee['password_hash'])) {
-                // STAFF SUCCESSFUL
-                $_SESSION['employee_id'] = $employee['employee_id'];
-                $_SESSION['user_id'] = $employee['employee_id']; // Consistency with auth checks
-                $_SESSION['email'] = $employee['email'];
-                $_SESSION['role_name'] = 'Staff';
-                $_SESSION['schema_name'] = $schema;
-                $_SESSION['is_logged_in'] = true;
+                if ($employee && password_verify($password, $employee['password_hash'])) {
+                    // STAFF SUCCESSFUL
+                    $_SESSION['employee_id'] = $employee['employee_id'];
+                    $_SESSION['user_id'] = $employee['employee_id']; // Consistency with auth checks
+                    $_SESSION['email'] = $employee['email'];
+                    $_SESSION['role_name'] = 'Staff';
+                    $_SESSION['schema_name'] = $schema;
+                    $_SESSION['is_logged_in'] = true;
 
-                // Get shop name if possible for session (optional but nice)
-                $stmt_shop = $pdo->prepare("SELECT shop_name FROM \"$schema\".tenant_settings LIMIT 1");
-                $stmt_shop->execute();
-                $_SESSION['business_name'] = $stmt_shop->fetchColumn() ?: 'Staff Dashboard';
+                    // Get shop name if possible for session (optional but nice)
+                    $stmt_shop = $pdo->prepare("SELECT shop_name FROM \"$schema\".tenant_settings LIMIT 1");
+                    $stmt_shop->execute();
+                    $_SESSION['business_name'] = $stmt_shop->fetchColumn() ?: 'Staff Dashboard';
 
-                // STAFF BYPASSES OTP
-                header("Location: ../../views/boardstaff/dashboard.php");
-                exit;
+                    // STAFF BYPASSES OTP
+                    header("Location: ../../views/boardstaff/dashboard.php");
+                    exit;
+                }
+            } catch (PDOException $e) {
+                // If the table doesn't exist (like in your test schema), silently ignore and check the next one!
+                continue; 
             }
         }
 
