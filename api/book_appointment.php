@@ -60,8 +60,7 @@ try {
 
     echo json_encode([
         "status" => "success",
-        "message" => "Appointment booked successfully. Waiting for store confirmation.",
-        "appointment_id" => $pdo->lastInsertId()
+        "message" => "Appointment booked successfully. Waiting for store confirmation."
     ]);
 
 } catch (PDOException $e) {

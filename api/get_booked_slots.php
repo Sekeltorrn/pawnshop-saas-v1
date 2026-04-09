@@ -57,7 +57,7 @@ try {
 
     echo json_encode([
         "status" => "success",
-        "data" => $appointments
+        "appointments" => $appointments
     ]);
 
 } catch (PDOException $e) {
