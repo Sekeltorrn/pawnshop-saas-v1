@@ -30,6 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
                 gold_rate_21k = ?, 
                 gold_rate_24k = ?,
                 diamond_base_rate = ?,
+                store_open_time = ?,
+                store_close_time = ?,
+                closed_days = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE setting_id = (SELECT setting_id FROM " . $tenant_schema . ".tenant_settings LIMIT 1)
         ");
@@ -41,7 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
             floatval($_POST['gold_rate_18k']),
             floatval($_POST['gold_rate_21k']),
             floatval($_POST['gold_rate_24k']),
-            floatval($_POST['diamond_base_rate'])
+            floatval($_POST['diamond_base_rate']),
+            $_POST['store_open_time'] ?? '08:00:00',
+            $_POST['store_close_time'] ?? '17:00:00',
+            json_encode($_POST['closed_days'] ?? [])
         ]);
         
         $success_msg = "System parameters successfully updated and synchronized.";
@@ -86,9 +92,17 @@ try {
         $settings = [
             'ltv_percentage' => 60.00, 'interest_rate' => 3.50, 'service_fee' => 5.00,
             'gold_rate_18k' => 3000.00, 'gold_rate_21k' => 3500.00, 'gold_rate_24k' => 4200.00,
-            'diamond_base_rate' => 50000.00
+            'diamond_base_rate' => 50000.00,
+            'store_open_time' => '08:00:00',
+            'store_close_time' => '17:00:00',
+            'closed_days' => '["Sunday"]'
         ];
     }
+
+    // Process variables for UI usage
+    $active_closed_days = json_decode($settings['closed_days'] ?? '["Sunday"]', true) ?: [];
+    $formatted_open_time = !empty($settings['store_open_time']) ? date("H:i", strtotime($settings['store_open_time'])) : "08:00";
+    $formatted_close_time = !empty($settings['store_close_time']) ? date("H:i", strtotime($settings['store_close_time'])) : "17:00";
 } catch (PDOException $e) {
     die("Database Error: " . $e->getMessage());
 }
@@ -96,6 +110,11 @@ try {
 $pageTitle = 'Node Configuration';
 include 'includes/header.php';
 ?>
+
+<!-- Flatpickr Assets -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <div class="max-w-7xl mx-auto w-full px-4 pb-12">
     
@@ -220,6 +239,45 @@ include 'includes/header.php';
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Operating Schedule Card -->
+                        <div class="bg-[#141518] p-8 border border-white/5 relative overflow-hidden group">
+                           <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+                           <h3 class="text-white font-black mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] border-b border-white/5 pb-4">
+                               <span class="material-symbols-outlined text-blue-500 text-lg">schedule</span> Operating Schedule
+                           </h3>
+
+                           <div class="grid grid-cols-2 gap-4">
+                               <div>
+                                   <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Store Open Time</label>
+                                   <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-blue-500/50 transition-colors">
+                                       <input type="text" name="store_open_time" value="<?= $formatted_open_time ?>" class="flatpickr-time w-full bg-transparent p-4 text-white text-xs font-mono outline-none cursor-pointer">
+                                   </div>
+                               </div>
+                               <div>
+                                   <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Store Close Time</label>
+                                   <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-blue-500/50 transition-colors">
+                                       <input type="text" name="store_close_time" value="<?= $formatted_close_time ?>" class="flatpickr-time w-full bg-transparent p-4 text-white text-xs font-mono outline-none cursor-pointer">
+                                   </div>
+                               </div>
+                           </div>
+
+                           <div class="mt-6">
+                               <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3">Closed Days (Auto-Reject Bookings)</label>
+                               <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-3 gap-2">
+                                   <?php 
+                                   $days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+                                   foreach($days_of_week as $day): 
+                                       $is_checked = in_array($day, $active_closed_days);
+                                   ?>
+                                   <label class="flex items-center gap-2 p-2 bg-[#0a0b0d] border border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+                                       <input type="checkbox" name="closed_days[]" value="<?= $day ?>" <?= $is_checked ? 'checked' : '' ?> class="accent-blue-500">
+                                       <span class="text-[9px] text-slate-400 font-mono uppercase"><?= $day ?></span>
+                                   </label>
+                                   <?php endforeach; ?>
+                               </div>
+                           </div>
                         </div>
                     </div>
 
@@ -582,7 +640,20 @@ include 'includes/header.php';
     }
 
     // Run once on load to establish initial render
-    document.addEventListener('DOMContentLoaded', updatePreview);
+    document.addEventListener('DOMContentLoaded', function() {
+        updatePreview();
+        
+        // Initialize Flatpickr for Store Hours
+        flatpickr(".flatpickr-time", {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: "H:i:S", // Format saved to database
+            altInput: true,
+            altFormat: "h:i K",  // Format shown to the user (e.g., 08:00 AM)
+            time_24hr: false,
+            disableMobile: "true" // Forces the custom UI even on mobile
+        });
+    });
 </script>
 
 <?php 

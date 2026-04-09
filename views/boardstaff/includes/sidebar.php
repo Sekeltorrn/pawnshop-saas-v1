@@ -38,9 +38,9 @@ $inactive_link_class = "border-transparent text-on-surface-variant/40 hover:bg-s
             <span>Identity</span>
         </a>
 
-        <a href="manage_consultations.php" class="<?= $base_link_class ?> <?= ($current_page == 'manage_consultations.php') ? $active_link_class : $inactive_link_class ?>">
+        <a href="appointments.php" class="<?= $base_link_class ?> <?= ($current_page == 'appointments.php') ? $active_link_class : $inactive_link_class ?>">
             <span class="material-symbols-outlined text-[18px]">analytics</span>
-            <span>Appraisals</span>
+            <span>Appointments</span>
         </a>
 
         <a href="shift_manager.php" class="<?= $base_link_class ?> <?= ($current_page == 'shift_manager.php') ? $active_link_class : $inactive_link_class ?>">

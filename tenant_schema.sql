@@ -234,6 +234,9 @@ create table tenant_settings (
   timezone character varying(50) not null default 'Asia/Manila'::character varying,
   created_at timestamp with time zone null default timezone ('utc'::text, now()),
   updated_at timestamp with time zone null default timezone ('utc'::text, now()),
+  store_open_time time without time zone null default '08:00:00'::time without time zone,
+  store_close_time time without time zone null default '17:00:00'::time without time zone,
+  closed_days jsonb null default '["Sunday"]'::jsonb,
   constraint tenant_settings_pkey primary key (setting_id)
 );
 
