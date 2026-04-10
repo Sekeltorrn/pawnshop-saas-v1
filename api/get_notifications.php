@@ -166,8 +166,11 @@ try {
     $stmt->execute(['customer_id' => $customer_id]);
     $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 6. Return Clean JSON Array
-    echo json_encode($notifications);
+    // 6. Return Clean JSON Object (Matching Kotlin Data Class)
+    echo json_encode([
+        "status" => "success",
+        "data" => $notifications
+    ]);
 
 } catch (Exception $e) {
     http_response_code(500);
