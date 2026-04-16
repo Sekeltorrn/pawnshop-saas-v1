@@ -56,6 +56,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$first_name, $last_name, $generated_email, $contact_no, $hashed_password, $id_type, $id_photo_path]);
             $customer_id = $stmt->fetchColumn();
             
+            // AUDIT LOG: New Walk-In Customer
+            record_audit_log($pdo, $tenant_schema, $current_user_id, 'INSERT', 'customers', $customer_id, null, [
+                'first_name' => $first_name, 
+                'last_name'  => $last_name, 
+                'email'      => $generated_email,
+                'is_walk_in' => true
+            ]);
+            
         } else {
             // It's an existing customer, just grab the ID from the dropdown
             $customer_id = $_POST['customer_id'];
@@ -131,6 +139,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $item_id = $stmt->fetchColumn();
 
+        // AUDIT LOG: Inventory Asset Vaulted
+        record_audit_log($pdo, $tenant_schema, $current_user_id, 'INSERT', 'inventory', $item_id, null, [
+            'item_name'       => $item_name,
+            'category'        => $target_category,
+            'appraised_value' => $appraised_value,
+            'status'          => 'in_vault'
+        ]);
+
         // ==============================================================================
         // STEP 3: CREATE THE FINANCIAL LOAN CONTRACT
         // ==============================================================================
@@ -162,24 +178,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($shop_prefix)) $shop_prefix = "PWN";
         $current_year = date('Y');
 
-        // Insert Loan AND automatically calculate the Due Date (1 month) and Expiry Date (4 months)
-        $stmt = $pdo->prepare("
+        $due_date = date('Y-m-d', strtotime('+1 month'));
+        $expiry_date = date('Y-m-d', strtotime('+4 months'));
+        $shift_id = $_POST['shift_id'] ?? null;
+
+        $insert_stmt = $pdo->prepare("
             INSERT INTO loans 
-            (customer_id, item_id, principal_amount, interest_rate, due_date, expiry_date, service_charge, net_proceeds, status) 
-            VALUES (?, ?, ?, ?, CURRENT_DATE + INTERVAL '1 month', CURRENT_DATE + INTERVAL '4 months', ?, ?, 'active') 
-            RETURNING pawn_ticket_no
+            (customer_id, item_id, principal_amount, interest_rate, due_date, expiry_date, service_charge, net_proceeds, status, loan_date, employee_id, shift_id) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_DATE, ?, ?) 
+            RETURNING loan_id, pawn_ticket_no
         ");
-        $stmt->execute([
+        
+        $insert_stmt->execute([
             $customer_id, 
             $item_id, 
             $principal_amount, 
             $interest_rate, 
+            $due_date,
+            $expiry_date,
             $service_charge, 
-            $calculated_net 
+            $calculated_net,
+            $current_user_id,
+            $shift_id
         ]);
         
-        // The database generated the official sequential sequence number
-        $sequential_id = $stmt->fetchColumn(); $pawn_ticket_no = $sequential_id;
+        $loan_res = $insert_stmt->fetch(PDO::FETCH_ASSOC);
+        $sequential_id = $loan_res['pawn_ticket_no']; $pawn_ticket_no = $sequential_id;
+
+        // AUDIT LOG: Loan Issued
+        record_audit_log($pdo, $tenant_schema, $current_user_id, 'INSERT', 'loans', $sequential_id, null, [
+            'principal_amount' => $principal_amount,
+            'interest_rate'    => $interest_rate,
+            'due_date'         => date('Y-m-d', strtotime('+1 month'))
+        ]);
         
         // Finalize the Professional Reference Number
         $formatted_ticket = $shop_prefix . '-' . $current_year . '-' . str_pad($sequential_id, 5, '0', STR_PAD_LEFT);

@@ -60,7 +60,7 @@ $inactive_link_class = "border-transparent text-on-surface-variant/40 hover:bg-s
             </div>
         </div>
         
-        <a href="../../logout.php" class="flex items-center justify-center gap-3 w-full py-4 bg-error/5 border border-error/20 text-error font-headline text-[10px] font-bold uppercase tracking-[0.3em] hover:bg-error hover:text-black transition-all rounded-sm group">
+        <a href="logout.php" class="flex items-center justify-center gap-3 w-full py-4 bg-error/5 border border-error/20 text-error font-headline text-[10px] font-bold uppercase tracking-[0.3em] hover:bg-error hover:text-black transition-all rounded-sm group">
             <span class="material-symbols-outlined text-[16px] group-hover:rotate-180 transition-transform">logout</span>
             <span>End_Session</span>
         </a>

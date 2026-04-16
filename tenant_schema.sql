@@ -3,7 +3,7 @@ create table audit_logs (
   employee_id uuid null,
   action_type character varying(50) not null,
   table_affected character varying(50) not null,
-  record_id uuid null,
+  record_id character varying(255) null,
   old_data jsonb null,
   new_data jsonb null,
   ip_address character varying(45) null,
@@ -99,6 +99,9 @@ create table inventory (
   storage_location text null,
   created_at timestamp with time zone null default timezone ('utc'::text, now()),
   updated_at timestamp with time zone null default timezone ('utc'::text, now()),
+  retail_price numeric(15, 2) null,
+  lot_name character varying(100) null,
+  lot_price numeric(15, 2) null,
   constraint inventory_pkey primary key (item_id),
   constraint inventory_category_id_fkey foreign KEY (category_id) references categories (category_id) on delete RESTRICT
 );
@@ -106,6 +109,22 @@ create table inventory (
 create trigger update_inventory_modtime BEFORE
 update on inventory for EACH row
 execute FUNCTION update_updated_at_column ();
+
+
+create table storage_locations (
+  location_id uuid not null default gen_random_uuid (),
+  location_name character varying(255) not null,
+  created_at timestamp with time zone null default timezone ('utc'::text, now()),
+  constraint storage_locations_pkey primary key (location_id)
+) TABLESPACE pg_default;
+
+
+create table retail_lots (
+  lot_name character varying(100) not null,
+  lot_price numeric(15, 2) null,
+  created_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  constraint retail_lots_pkey primary key (lot_name)
+)
 
 
 create table loans (
@@ -122,12 +141,11 @@ create table loans (
   service_charge numeric(10, 2) null default 5.00,
   net_proceeds numeric(10, 2) null,
   employee_id uuid null,
-  penalty_amount numeric(15, 2) null default 0.00,
-  renewal_count integer null default 0,
-  redemption_date timestamp with time zone null,
   updated_at timestamp with time zone null default timezone ('utc'::text, now()),
   reference_no character varying(50) null,
   expiry_date date null,
+  reminder_sent boolean null default false,
+  shift_id uuid null,
   constraint loans_pkey primary key (loan_id),
   constraint loans_reference_no_key unique (reference_no),
   constraint loans_customer_id_fkey foreign KEY (customer_id) references customers (customer_id),
@@ -262,6 +280,14 @@ create table profile_change_requests (
 create trigger update_profile_change_modtime BEFORE
 update on profile_change_requests for EACH row
 execute FUNCTION update_updated_at_column ();
+
+
+create table retail_lots (
+  lot_name character varying(100) not null,
+  lot_price numeric(15, 2) null,
+  created_at timestamp without time zone null default CURRENT_TIMESTAMP,
+  constraint retail_lots_pkey primary key (lot_name)
+);
 
 
 create table appointments (

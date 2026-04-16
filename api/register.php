@@ -63,23 +63,85 @@ $first_name = $name_parts[0];
 $last_name  = isset($name_parts[1]) ? $name_parts[1] : '';
 
 try {
-    $pdo->exec("SET search_path TO \"$schemaName\", public;");
-
-    // Check if email already exists
-    $checkStmt = $pdo->prepare("SELECT customer_id FROM customers WHERE email = ?");
-    $checkStmt->execute([$email]);
-    if ($checkStmt->fetch()) {
+    // 1. Check if email already exists LOCALLY in this specific shop
+    // If they already have an account here, we stop them so they don't duplicate.
+    $pdo->exec("SET search_path TO \"$schemaName\"");
+    $checkLocal = $pdo->prepare("SELECT customer_id FROM customers WHERE email = ?");
+    $checkLocal->execute([$email]);
+    if ($checkLocal->fetch()) {
         http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "This email is already registered. Please login instead."]);
+        echo json_encode(["status" => "error", "message" => "You are already registered at this specific shop. Please log in."]);
         exit();
     }
 
-    // Insert new user directly
+    // 2. Check if the user already exists GLOBALLY (in the public.customers bridge table)
+    $pdo->exec("SET search_path TO public");
+    $checkGlobal = $pdo->prepare("SELECT id FROM customers WHERE email = ?");
+    $checkGlobal->execute([$email]);
+    $globalUser = $checkGlobal->fetch(PDO::FETCH_ASSOC);
+
+    $real_auth_uuid = null;
+
+    if ($globalUser) {
+        // SCENARIO A: MULTI-SHOP REGISTRATION
+        // They already have a Global Passport (e.g., from Pawnshop A).
+        // We reuse their existing, genuine Supabase UUID. No need to call Supabase API!
+        $real_auth_uuid = $globalUser['id'];
+    } else {
+        // SCENARIO B: BRAND NEW PLATFORM USER
+        // Call the Supabase Admin API to create their Global Auth account using "God Mode"
+        $supabase_url = getenv('SUPABASE_URL'); 
+        $service_key  = getenv('SUPABASE_SERVICE_KEY'); // Uses the exact Render Env Variable
+        
+        if (!$supabase_url || !$service_key) {
+            throw new Exception("Missing Supabase configuration on server.");
+        }
+
+        $supabase_payload = json_encode([
+            'email' => $email,
+            'password' => $password,
+            'email_confirm' => false, // Set to true if you want to bypass email verification limits
+            'user_metadata' => [
+                'account_type' => 'customer', // This triggers your Smart Traffic Cop SQL!
+                'full_name' => $first_name . ' ' . $last_name
+            ]
+        ]);
+
+        $ch = curl_init($supabase_url . '/auth/v1/admin/users');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $supabase_payload);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'apikey: ' . $service_key,
+            'Authorization: Bearer ' . $service_key,
+            'Content-Type: application/json'
+        ]);
+        
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        $supabase_user = json_decode($response, true);
+
+        // Catch Supabase failures (like weak passwords)
+        if ($http_code >= 400 || !isset($supabase_user['id'])) {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "Auth Error: " . ($supabase_user['msg'] ?? 'Registration failed.')]);
+            exit();
+        }
+
+        // Capture the brand new, genuine UUID
+        $real_auth_uuid = $supabase_user['id'];
+    }
+
+    // 3. Insert into the TENANT'S Local Customer Table using the Genuine UUID
+    $pdo->exec("SET search_path TO \"$schemaName\"");
     $stmt = $pdo->prepare("INSERT INTO customers (auth_user_id, first_name, last_name, email, contact_no, password, is_walk_in, status) 
-                           VALUES (gen_random_uuid(), :fname, :lname, :email, :phone, :pass, FALSE, 'unverified')
+                           VALUES (:auth_id, :fname, :lname, :email, :phone, :pass, FALSE, 'unverified')
                            RETURNING customer_id");
     
     $stmt->execute([
+        ':auth_id' => $real_auth_uuid, // NO MORE gen_random_uuid()!
         ':fname'   => $first_name,
         ':lname'   => $last_name,
         ':email'   => $email,
@@ -87,41 +149,19 @@ try {
         ':pass'    => $hashed_password, 
     ]);
 
-    // ==============================================================
-    // NEW: AUTOMATICALLY TRIGGER SUPABASE REGISTRATION OTP
-    // ==============================================================
-    $supabase_url = getenv('SUPABASE_URL'); 
-    $api_key      = getenv('SUPABASE_ANON_KEY');
+    // 4. Trigger OTP via your custom flow (If you are using Supabase's built-in email templates, 
+    //    the Admin API already triggered it. If you need a manual resend, do it here).
 
-    if ($supabase_url && $api_key) {
-        $payload = json_encode([
-            'email'       => $email,
-            'create_user' => true // Tells Supabase this is a new registration
-        ]);
-
-        $ch = curl_init($supabase_url . '/auth/v1/otp');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'apikey: ' . $api_key,
-            'Content-Type: application/json'
-        ]);
-        
-        // Execute request silently in the background
-        curl_exec($ch);
-        curl_close($ch);
-    }
-    // ==============================================================
-
-    // Return the updated success message
     echo json_encode([
         "status" => "success",
-        "message" => "Account created! A verification code has been sent to your email."
+        "message" => "Account created successfully! A verification code has been sent to your email."
     ]);
 
 } catch (PDOException $e) {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]);
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(["status" => "error", "message" => "System Error: " . $e->getMessage()]);
 }
 ?>

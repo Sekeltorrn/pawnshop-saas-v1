@@ -107,6 +107,36 @@ try {
     die("Database Error: " . $e->getMessage());
 }
 
+// 6. STORAGE LOCATION MANAGEMENT
+$locations = [];
+try {
+    // Handle Adding Location
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_location'])) {
+        $new_location = trim($_POST['new_location_name'] ?? '');
+        if (!empty($new_location)) {
+            $stmt = $pdo->prepare("INSERT INTO " . $tenant_schema . ".storage_locations (location_name) VALUES (?)");
+            $stmt->execute([$new_location]);
+            $success_msg = "New vault added to system.";
+        }
+    }
+
+    // Handle Deleting Location
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['delete_location'])) {
+        $loc_id = $_POST['delete_location'];
+        $stmt = $pdo->prepare("DELETE FROM " . $tenant_schema . ".storage_locations WHERE location_id = ?::uuid");
+        $stmt->execute([$loc_id]);
+        $success_msg = "Vault removed from system.";
+    }
+
+    // Fetch all locations to display
+    $locStmt = $pdo->prepare("SELECT * FROM " . $tenant_schema . ".storage_locations ORDER BY created_at ASC");
+    $locStmt->execute();
+    $locations = $locStmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+    // Fails silently if the table hasn't been created in the schema yet
+}
+
 $pageTitle = 'Node Configuration';
 include 'includes/header.php';
 ?>
@@ -241,50 +271,90 @@ include 'includes/header.php';
                             </div>
                         </div>
 
-                        <!-- Operating Schedule Card -->
-                        <div class="bg-[#141518] p-8 border border-white/5 relative overflow-hidden group">
-                           <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
-                           <h3 class="text-white font-black mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] border-b border-white/5 pb-4">
-                               <span class="material-symbols-outlined text-blue-500 text-lg">schedule</span> Operating Schedule
-                           </h3>
-
-                           <div class="grid grid-cols-2 gap-4">
-                               <div>
-                                   <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Store Open Time</label>
-                                   <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-blue-500/50 transition-colors">
-                                       <input type="text" name="store_open_time" value="<?= $formatted_open_time ?>" class="flatpickr-time w-full bg-transparent p-4 text-white text-xs font-mono outline-none cursor-pointer">
-                                   </div>
-                               </div>
-                               <div>
-                                   <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Store Close Time</label>
-                                   <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-blue-500/50 transition-colors">
-                                       <input type="text" name="store_close_time" value="<?= $formatted_close_time ?>" class="flatpickr-time w-full bg-transparent p-4 text-white text-xs font-mono outline-none cursor-pointer">
-                                   </div>
-                               </div>
-                           </div>
-
-                           <div class="mt-6">
-                               <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3">Closed Days (Auto-Reject Bookings)</label>
-                               <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-3 gap-2">
-                                   <?php 
-                                   $days_of_week = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-                                   foreach($days_of_week as $day): 
-                                       $is_checked = in_array($day, $active_closed_days);
-                                   ?>
-                                   <label class="flex items-center gap-2 p-2 bg-[#0a0b0d] border border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
-                                       <input type="checkbox" name="closed_days[]" value="<?= $day ?>" <?= $is_checked ? 'checked' : '' ?> class="accent-blue-500">
-                                       <span class="text-[9px] text-slate-400 font-mono uppercase"><?= $day ?></span>
-                                   </label>
-                                   <?php endforeach; ?>
-                               </div>
-                           </div>
-                        </div>
                     </div>
 
-                    <button type="submit" class="w-full bg-[#00ff41] hover:bg-[#00cc33] text-black font-black py-4 uppercase tracking-[0.2em] text-[11px] shadow-[0_0_20px_rgba(0,255,65,0.2)] hover:shadow-[0_0_30px_rgba(0,255,65,0.4)] transition-all flex items-center justify-center gap-2">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mt-8">
+                        
+                        <div class="bg-[#141518] p-8 border border-white/5 relative overflow-hidden group">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+                            <h3 class="text-white font-black mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] border-b border-white/5 pb-4">
+                                <span class="material-symbols-outlined text-blue-500 text-lg">schedule</span> Operating Schedule
+                            </h3>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Store Open Time</label>
+                                    <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-blue-500/50 transition-colors">
+                                        <input type="text" name="store_open_time" value="<?= htmlspecialchars($settings['store_open_time'] ?? '09:00:00') ?>" class="flatpickr-time w-full bg-transparent p-4 text-white text-xs font-mono outline-none cursor-pointer">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Store Close Time</label>
+                                    <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-blue-500/50 transition-colors">
+                                        <input type="text" name="store_close_time" value="<?= htmlspecialchars($settings['store_close_time'] ?? '17:00:00') ?>" class="flatpickr-time w-full bg-transparent p-4 text-white text-xs font-mono outline-none cursor-pointer">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-6">
+                                <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-3">Closed Days (Auto-Reject Bookings)</label>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-3 gap-2">
+                                    <?php 
+                                    $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                                    $closed_days_array = isset($settings['closed_days']) ? json_decode($settings['closed_days'], true) : [];
+                                    if (!is_array($closed_days_array)) $closed_days_array = [];
+                                    
+                                    foreach($days as $day): 
+                                        $isChecked = in_array($day, $closed_days_array) ? 'checked' : '';
+                                    ?>
+                                    <label class="flex items-center gap-2 p-2 bg-[#0a0b0d] border border-white/5 cursor-pointer hover:bg-white/5 transition-colors">
+                                        <input type="checkbox" name="closed_days[]" value="<?= $day ?>" <?= $isChecked ?> class="accent-blue-500">
+                                        <span class="text-[9px] text-slate-400 font-mono uppercase"><?= $day ?></span>
+                                    </label>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-[#141518] p-8 border border-white/5 relative overflow-hidden group">
+                            <div class="absolute top-0 right-0 w-32 h-32 bg-[#00ff41]/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+                            <h3 class="text-white font-black mb-6 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] border-b border-white/5 pb-4">
+                                <span class="material-symbols-outlined text-[#00ff41] text-lg">door_sliding</span> Vault & Storage Management
+                            </h3>
+                            
+                            <p class="text-[9px] text-slate-500 font-mono uppercase mb-4">Manage the exact physical locations employees can assign to pawned items.</p>
+
+                            <div class="space-y-2 mb-6">
+                                <?php if (empty($locations)): ?>
+                                    <p class="text-[10px] text-slate-500 font-mono uppercase p-4 bg-[#0a0b0d] border border-white/5 text-center italic">No storage locations configured.</p>
+                                <?php else: ?>
+                                    <?php foreach ($locations as $loc): ?>
+                                        <div class="flex items-center justify-between bg-[#0a0b0d] border border-white/5 p-3 hover:border-white/10 transition-colors">
+                                            <span class="text-xs text-white font-mono uppercase tracking-wide flex items-center gap-2">
+                                                <span class="material-symbols-outlined text-slate-600 text-sm">inventory_2</span>
+                                                <?= htmlspecialchars($loc['location_name']) ?>
+                                            </span>
+                                            <button type="submit" name="delete_location" value="<?= $loc['location_id'] ?>" onclick="return confirm('Warning: Remove this vault?');" class="text-slate-600 hover:text-red-500 transition-colors flex items-center">
+                                                <span class="material-symbols-outlined text-[16px]">delete</span>
+                                            </button>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="flex gap-2">
+                                <input type="text" name="new_location_name" placeholder="e.g. Vault C: Overflow Rack" class="flex-1 bg-[#0a0b0d] border border-white/10 p-4 text-white text-xs font-mono outline-none focus:border-[#00ff41]/50 transition-colors">
+                                <button type="submit" name="add_location" value="1" class="bg-[#00ff41]/10 text-[#00ff41] border border-[#00ff41]/50 hover:bg-[#00ff41] hover:text-black font-black px-6 text-[10px] uppercase tracking-widest transition-all">
+                                    Add Vault
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <button type="submit" name="update_settings" value="1" class="w-full bg-[#00ff41] mt-8 hover:bg-[#00cc33] text-black font-black py-4 uppercase tracking-[0.2em] text-[11px] shadow-[0_0_20px_rgba(0,255,65,0.2)] hover:shadow-[0_0_30px_rgba(0,255,65,0.4)] transition-all flex items-center justify-center gap-2">
                         <span class="material-symbols-outlined text-sm">save</span> Synchronize System Parameters
                     </button>
-                </form>
             </div>
 
             <div id="cfg-portal" class="config-pane hidden animate-in fade-in duration-300">

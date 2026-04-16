@@ -1,3 +1,45 @@
+<?php
+// --- MIDNIGHT AUTO-CLOSE ENGINE (Lazy Cron) ---
+// This runs silently in the background on page load to seal stale shifts
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+if (isset($_SESSION['schema_name']) && isset($pdo)) {
+    try {
+        $schema = $_SESSION['schema_name'];
+        $pdo->exec("SET search_path TO \"$schema\", public;");
+
+        // Find stale shifts (opened before today)
+        $stale_stmt = $pdo->query("SELECT shift_id, employee_id, start_time, starting_cash FROM shifts WHERE status = 'Open' AND DATE(start_time) < CURRENT_DATE");
+        $stale_shifts = $stale_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($stale_shifts)) {
+            foreach ($stale_shifts as $stale) {
+                $s_id = $stale['shift_id'];
+
+                // 1. Calculate Expected Cash at the exact moment of auto-close
+                $calc_stmt = $pdo->prepare("
+                    SELECT 
+                        (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE shift_id = ? AND payment_channel = 'Walk-In' AND status = 'completed') as cash_in,
+                        (SELECT COALESCE(SUM(net_proceeds), 0) FROM loans WHERE employee_id = ? AND created_at >= ? AND status != 'cancelled') as cash_out
+                ");
+                $calc_stmt->execute([$s_id, $stale['employee_id'], $stale['start_time']]);
+                $calc = $calc_stmt->fetch(PDO::FETCH_ASSOC);
+
+                $expected = (float)$stale['starting_cash'] + (float)$calc['cash_in'] - (float)$calc['cash_out'];
+
+                // 2. Force Auto-Close
+                $close_stmt = $pdo->prepare("
+                    UPDATE shifts 
+                    SET actual_closing_cash = ?, expected_cash = ?, variance = 0, status = 'Auto-Closed', end_time = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
+                    WHERE shift_id = ?
+                ");
+                $close_stmt->execute([$expected, $expected, $s_id]);
+            }
+        }
+    } catch (Exception $e) { /* Fail silently to prevent UI breaking */ }
+}
+// ----------------------------------------------
+?>
 <!DOCTYPE html>
 <html class="dark" lang="en">
 <head>

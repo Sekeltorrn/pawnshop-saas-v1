@@ -33,16 +33,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             // Set status to confirmed
             $stmt = $pdo->prepare("UPDATE appointments SET status = 'confirmed', updated_at = NOW() WHERE appointment_id = ?");
             $stmt->execute([$appointment_id]);
+            
+            // AUDIT LOG: Appointment Confirmed
+            record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'appointments', $appointment_id, ['status' => 'pending'], ['status' => 'confirmed']);
+            
             $success_msg = "Appointment confirmed successfully.";
         } elseif ($action === 'cancel') {
             // Set status to cancelled with optional notes
             $stmt = $pdo->prepare("UPDATE appointments SET status = 'cancelled', admin_notes = ?, updated_at = NOW() WHERE appointment_id = ?");
             $stmt->execute([$admin_notes, $appointment_id]);
+            
+            // AUDIT LOG: Appointment Cancelled
+            record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'appointments', $appointment_id, ['status' => 'pending'], ['status' => 'cancelled', 'admin_notes' => $admin_notes]);
+            
             $success_msg = "Appointment has been cancelled.";
         } elseif ($action === 'complete') {
             // Set status to completed
             $stmt = $pdo->prepare("UPDATE appointments SET status = 'completed', updated_at = NOW() WHERE appointment_id = ?");
             $stmt->execute([$appointment_id]);
+            
+            // AUDIT LOG: Appointment Completed
+            record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'appointments', $appointment_id, ['status' => 'confirmed'], ['status' => 'completed']);
+            
             $success_msg = "Appointment marked as completed.";
         }
     } catch (PDOException $e) {

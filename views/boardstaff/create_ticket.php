@@ -33,6 +33,17 @@ try {
     $sys_settings = null;
 }
 
+// Fetch dynamic storage locations for the dropdown
+$storage_locations = [];
+try {
+    $pdo->exec("SET search_path TO \"$schemaName\", public;");
+    $locStmt = $pdo->prepare("SELECT location_name FROM storage_locations ORDER BY created_at ASC");
+    $locStmt->execute();
+    $storage_locations = $locStmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // Fails silently if table is empty or missing; will trigger fallback below
+}
+
 $gold_rate_18k = $sys_settings['gold_rate_18k'] ?? 3000.00;
 $gold_rate_21k = $sys_settings['gold_rate_21k'] ?? 3500.00;
 $gold_rate_24k = $sys_settings['gold_rate_24k'] ?? 4200.00;
@@ -41,6 +52,12 @@ $diamond_base_rate = $sys_settings['diamond_base_rate'] ?? 50000.00;
 $ltv_ratio = ($sys_settings['ltv_percentage'] ?? 60) / 100; 
 $month_1_rate = $sys_settings['interest_rate'] ?? 3.5;   
 $service_fee = $sys_settings['service_fee'] ?? 5.00;
+
+// GLOBALLY CHECK FOR ACTIVE SHIFT
+$pdo->exec("SET search_path TO \"$schemaName\", public;");
+$stmt_shift_check = $pdo->prepare("SELECT shift_id FROM shifts WHERE status = 'Open' AND employee_id = ? LIMIT 1");
+$stmt_shift_check->execute([$current_user_id]);
+$global_active_shift = $stmt_shift_check->fetchColumn();
 
 // 3. FETCH VERIFIED CUSTOMERS
 $customer_data = [];
@@ -70,6 +87,17 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
 ?>
 
 <main class="flex-1 overflow-y-auto p-6 flex flex-col gap-6 relative">
+
+    <?php if (!$global_active_shift): ?>
+        <div class="h-[800px] flex flex-col justify-center items-center text-center p-12">
+            <div class="w-24 h-24 rounded-full bg-error/10 border border-error/20 flex items-center justify-center mb-6 shadow-inner animate-pulse">
+                <span class="material-symbols-outlined text-4xl text-error">lock</span>
+            </div>
+            <h2 class="text-3xl font-headline font-black text-on-surface uppercase tracking-widest italic">Terminal <span class="text-error">Locked</span></h2>
+            <p class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.4em] mt-4 max-w-sm opacity-60 mb-8">You must initialize your physical cash drawer to process asset inductions.</p>
+            <a href="shift_manager.php" class="bg-error hover:bg-error/80 text-black font-headline font-black text-[10px] uppercase tracking-widest px-8 py-4 rounded-sm transition-all shadow-[0_0_15px_rgba(239,68,68,0.2)]">Go to Shift Manager</a>
+        </div>
+    <?php else: ?>
     <div class="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-6">
         <div class="flex items-center gap-6">
             <a href="transactions.php" class="bg-surface-container-low border border-outline-variant/10 hover:bg-surface-container-highest text-on-surface-variant hover:text-primary p-3 rounded-sm transition-all group">
@@ -426,10 +454,19 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
                         <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Secure Zone Assignment</label>
-                        <select name="storage_location" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest transition-all">
-                            <?php $s_loc = $draft['storage_location'] ?? 'SEC-A: High-Sec Precious Safe'; ?>
-                            <option <?= $s_loc == 'SEC-A: High-Sec Precious Safe' ? 'selected' : '' ?>>SEC-A: High-Sec Precious Safe</option>
-                            <option <?= $s_loc == 'SEC-B: Climate-Controlled Rack' ? 'selected' : '' ?>>SEC-B: Climate-Controlled Rack</option>
+                        <select name="storage_location" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest transition-all" required>
+                            
+                            <option value="" disabled selected>-- ASSIGN TO VAULT --</option>
+                            
+                            <?php if (!empty($storage_locations)): ?>
+                                <?php foreach ($storage_locations as $loc): ?>
+                                    <option value="<?= htmlspecialchars($loc['location_name']) ?>" <?= (isset($draft['storage_location']) && $draft['storage_location'] == $loc['location_name']) ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($loc['location_name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                            <?php endif; ?>
+                            
                         </select>
                     </div>
                     <div>
@@ -489,6 +526,7 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
                 <input type="hidden" name="net_proceeds" id="input-net">
                 <input type="hidden" name="service_charge" value="<?= $service_fee ?>">
                 <input type="hidden" name="system_interest_rate" value="<?= $month_1_rate ?>">
+                <input type="hidden" name="shift_id" value="<?= htmlspecialchars($global_active_shift) ?>">
 
                 <button type="submit" class="w-full mt-12 bg-primary hover:bg-primary/90 text-black font-headline font-bold py-6 uppercase tracking-[0.5em] text-[13px] shadow-[0_0_30px_rgba(0,255,65,0.2)] transition-all rounded-sm italic">
                     AUTHORIZE_LOAN
@@ -496,6 +534,7 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
             </div>
         </div>
     </form>
+    <?php endif; ?>
 </main>
 
 <script>

@@ -1,294 +1,408 @@
 <?php
-// Enable error reporting for development
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 session_start();
-require_once '../../config/db_connect.php'; 
+$pageTitle = 'Inventory Hub';
+include 'includes/header.php';
+require_once '../../config/db_connect.php';
 
-// 1. SECURITY CHECK
-$current_user_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? null;
+$schemaName = $_SESSION['schema_name'] ?? '';
+if (!$schemaName) die("Matrix Error: Missing Tenant Context.");
 
-if (!$current_user_id) {
-    header("Location: ../auth/login.php?error=not_logged_in");
-    exit();
-}
+// --- AGGRESSIVE MASTER SYNC ---
+try {
+    $pdo->exec("SET search_path TO \"$schemaName\", public;");
+    $pdo->exec("UPDATE loans SET status = 'expired' WHERE status = 'active' AND expiry_date < CURRENT_DATE");
+    $pdo->exec("
+        UPDATE inventory SET item_status = 'expired', updated_at = NOW()
+        WHERE item_id IN (SELECT item_id FROM loans WHERE status = 'expired') AND item_status = 'in_vault'
+    ");
+    $pdo->exec("
+        UPDATE inventory SET item_status = 'redeemed', updated_at = NOW()
+        WHERE item_id IN (SELECT item_id FROM loans WHERE status = 'redeemed') AND item_status = 'in_vault'
+    ");
+} catch (PDOException $e) { error_log("Sync Error: " . $e->getMessage()); }
 
-$tenant_schema = $_SESSION['schema_name'] ?? null;
-if (!$tenant_schema) {
-    die("Unauthorized: No tenant context.");
-} 
-
-// 2. FETCH DYNAMIC INVENTORY DATA
-$inventory_items = [];
-$total_appraisal = 0;
-$active_items = 0;
-$rematado_items = 0;
+// --- FETCH DATA (Added Financial Columns) ---
+$stmt = $pdo->prepare("
+    SELECT DISTINCT ON (i.item_id) 
+        i.*, 
+        l.pawn_ticket_no, l.status as loan_status, l.expiry_date,
+        l.principal_amount, l.interest_rate, l.service_charge
+    FROM inventory i LEFT JOIN loans l ON i.item_id = l.item_id
+    ORDER BY i.item_id, l.created_at DESC
+");
+$stmt->execute();
+$allItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 try {
-    // Fetch inventory and link it to any existing active loans to get the pawn ticket number
-    $stmt = $pdo->prepare("
-        SELECT 
-            i.item_id, 
-            i.item_name, 
-            i.item_description, 
-            i.serial_number, 
-            i.weight_grams, 
-            i.appraised_value, 
-            i.item_condition, 
-            i.storage_location, 
-            i.item_status,
-            l.pawn_ticket_no
-        FROM {$tenant_schema}.inventory i
-        LEFT JOIN {$tenant_schema}.loans l ON i.item_id = l.item_id
-        ORDER BY i.created_at DESC
-    ");
-    $stmt->execute();
-    $inventory_items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $locStmt = $pdo->query("SELECT location_name FROM storage_locations ORDER BY location_name ASC");
+    $locations = $locStmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) { $locations = []; }
 
-    // Calculate Dashboard Stats
-    foreach ($inventory_items as $item) {
-        $total_appraisal += (float)$item['appraised_value'];
-        if ($item['item_status'] === 'in_vault') $active_items++;
-        if ($item['item_status'] === 'foreclosed') $rematado_items++;
-    }
-
-} catch (PDOException $e) {
-    die("Database Error: " . $e->getMessage());
+try {
+    $lotStmt = $pdo->query("SELECT lot_name FROM retail_lots ORDER BY lot_name ASC");
+    $retail_lots_list = $lotStmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) { 
+    $retail_lots_list = []; 
 }
 
-$pageTitle = 'Vault Inventory';
-include 'includes/header.php';
+// --- FILTERING & FINANCIAL MATH (SIMPLIFIED) ---
+$selected_loc = $_GET['loc'] ?? 'ALL';
+
+$in_vault = []; $redeemed = []; $rematado = []; $for_sale = [];
+$stats = [
+    'vault' => ['count' => 0, 'value' => 0],
+    'rematado' => ['count' => 0, 'value' => 0],
+    'retail' => ['count' => 0, 'value' => 0],
+    'redeemed' => ['count' => 0, 'value' => 0]
+];
+
+foreach ($allItems as $item) {
+    $status = strtolower(trim($item['item_status'] ?? ''));
+    $item_loc = $item['storage_location'] ?? '';
+
+    // 1. Filter Location
+    if ($selected_loc !== 'ALL' && $item_loc !== $selected_loc) continue;
+
+    // 2. Use the actual item worth directly from the database
+    $actual_value = (float)($item['appraised_value'] ?? 0);
+
+    // 3. Tally Counts & Actual Values
+    if ($status === 'expired' || $status === 'rematado') { 
+        $stats['rematado']['count']++; 
+        $stats['rematado']['value'] += $actual_value; 
+        $rematado[] = $item; 
+    } elseif ($status === 'redeemed') { 
+        $stats['redeemed']['count']++; 
+        $stats['redeemed']['value'] += $actual_value; 
+        $redeemed[] = $item; 
+    } elseif ($status === 'for_sale') { 
+        $stats['retail']['count']++; 
+        // Note: You can switch this to use retail_price if you prefer to see potential profit!
+        $stats['retail']['value'] += (float)($item['retail_price'] ?? $actual_value); 
+        $for_sale[] = $item; 
+    } else { 
+        $stats['vault']['count']++; 
+        $stats['vault']['value'] += $actual_value; 
+        $in_vault[] = $item; 
+    }
+}
 ?>
 
-<div class="max-w-7xl mx-auto w-full px-4 pb-12">
-    
-    <div class="mb-8 mt-4 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
-        <div>
-            <div class="inline-flex items-center gap-2 px-2 py-1 bg-purple-500/10 border border-purple-500/20 mb-3 rounded-sm">
-                <span class="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
-                <span class="text-[8px] uppercase font-black tracking-[0.2em] text-purple-400">Secure_Vault_Sync</span>
-            </div>
-            <h1 class="text-3xl md:text-4xl font-black text-white tracking-tighter uppercase italic font-display">
-                Vault <span class="text-[#ff6b00]">Inventory</span>
-            </h1>
-            <p class="text-slate-500 mt-1 text-[11px] font-mono uppercase tracking-widest">
-                Physical Asset Telemetry // Node: <?= htmlspecialchars(substr($current_user_id, 0, 8)) ?>
-            </p>
-        </div>
-        <div class="flex gap-3">
-            <button class="bg-[#141518] text-white border border-white/10 font-black text-[10px] uppercase tracking-[0.2em] px-6 py-3 hover:bg-white/5 transition-all flex items-center justify-center gap-2">
-                <span class="material-symbols-outlined text-sm">print</span> Labels
-            </button>
-            <button class="bg-[#ff6b00] text-black font-black text-[10px] uppercase tracking-[0.2em] px-6 py-3 shadow-[0_0_20px_rgba(255,107,0,0.3)] hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2">
-                <span class="material-symbols-outlined text-sm">add_box</span> Stock_In
-            </button>
-        </div>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div class="bg-[#141518] border border-white/5 p-5 border-l-2 border-l-purple-500 relative overflow-hidden group">
-            <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-6xl text-purple-500/10 group-hover:scale-110 transition-transform">inventory_2</span>
-            <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Secured_Assets</p>
-            <h3 class="text-2xl font-black text-white font-display"><?= $active_items ?> <span class="text-sm text-slate-500 font-sans tracking-normal">Items</span></h3>
-            <p class="text-[8px] text-purple-400 font-mono uppercase mt-2">Active Pawned Inventory</p>
-        </div>
-
-        <div class="bg-[#141518] border border-white/5 p-5 border-l-2 border-l-[#00ff41] relative overflow-hidden group">
-            <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-6xl text-[#00ff41]/10 group-hover:scale-110 transition-transform">diamond</span>
-            <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Total_Appraisal_Value</p>
-            <h3 class="text-2xl font-black text-[#00ff41] font-display">â‚±<?= number_format($total_appraisal, 2) ?></h3>
-            <p class="text-[8px] text-[#00ff41]/70 font-mono uppercase mt-2">Sum of Vaulted Assets</p>
-        </div>
-
-        <div class="bg-[#141518] border border-white/5 p-5 border-l-2 border-l-[#ff6b00] relative overflow-hidden group">
-            <span class="material-symbols-outlined absolute -right-4 -bottom-4 text-6xl text-[#ff6b00]/10 group-hover:scale-110 transition-transform">storefront</span>
-            <p class="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1">Rematado_/_Retail</p>
-            <h3 class="text-2xl font-black text-white font-display"><?= $rematado_items ?> <span class="text-sm text-slate-500 font-sans tracking-normal">Items</span></h3>
-            <p class="text-[8px] text-[#ff6b00] font-mono uppercase mt-2">Cleared for liquidation</p>
-        </div>
-    </div>
-
-    <div class="bg-[#0f1115] border border-white/5 p-2 flex flex-col md:flex-row gap-2 mb-4">
-        <div class="flex-1 flex items-center bg-[#0a0b0d] border border-white/5 px-3 focus-within:border-purple-500/50 transition-colors">
-            <span class="material-symbols-outlined text-slate-600 text-sm">qr_code_scanner</span>
-            <input type="text" placeholder="Scan Barcode or Search Item Hash/Specs..." class="w-full bg-transparent border-none text-white text-[11px] font-mono p-2.5 outline-none placeholder:text-slate-600 uppercase">
-        </div>
-    </div>
-
-    <div class="bg-[#141518] border border-white/5 overflow-x-auto relative">
-        <table class="w-full text-left whitespace-nowrap">
-            <thead>
-                <tr class="bg-[#0f1115] border-b border-white/5">
-                    <th class="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Item_Hash</th>
-                    <th class="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Asset Name</th>
-                    <th class="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Storage_Loc</th>
-                    <th class="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">State</th>
-                    <th class="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">Appraisal</th>
-                    <th class="px-4 py-3 text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] text-center">Action</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-white/5 text-white">
-                
-                <?php if(empty($inventory_items)): ?>
-                    <tr>
-                        <td colspan="6" class="px-4 py-12 text-center text-slate-500 font-mono text-xs uppercase tracking-widest">
-                            No assets currently in vault.
-                        </td>
-                    </tr>
-                <?php else: ?>
-                    <?php foreach ($inventory_items as $item): 
-                        // Process data for UI
-                        $hash = strtoupper(substr($item['item_id'], 0, 8)); // Short ID
-                        $status_color = $item['item_status'] === 'in_vault' ? '#00ff41' : '#ff6b00';
-                        $status_label = $item['item_status'] === 'in_vault' ? 'Secured' : 'Foreclosed';
-                        
-                        // Icon logic
-                        $icon = 'inventory_2';
-                        if (stripos($item['item_name'], 'gold') !== false || stripos($item['item_name'], 'ring') !== false) $icon = 'diamond';
-                        if (stripos($item['item_name'], 'phone') !== false || stripos($item['item_name'], 'mac') !== false) $icon = 'smartphone';
-                        if (stripos($item['item_name'], 'watch') !== false) $icon = 'watch';
-                    ?>
-                    <tr class="hover:bg-white/[0.02] transition-colors group">
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-2">
-                                <span class="material-symbols-outlined text-[#ff6b00] text-sm"><?= $icon ?></span>
-                                <span class="text-[10px] font-mono text-slate-300">INV-<?= $hash ?></span>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3">
-                            <p class="text-[11px] font-bold uppercase truncate max-w-[200px]" title="<?= htmlspecialchars($item['item_name']) ?>">
-                                <?= htmlspecialchars($item['item_name']) ?>
-                            </p>
-                            <div class="flex gap-2 mt-1 truncate max-w-[250px]">
-                                <span class="text-[8px] text-slate-400 font-mono truncate">
-                                    <?= htmlspecialchars($item['item_description'] ?: 'No specs recorded') ?>
-                                </span>
-                            </div>
-                        </td>
-                        <td class="px-4 py-3">
-                            <span class="text-[9px] font-mono text-slate-400 bg-white/5 px-1.5 py-0.5 border border-white/10 uppercase tracking-widest">
-                                <?= htmlspecialchars($item['storage_location'] ?? 'UNASSIGNED') ?>
-                            </span>
-                        </td>
-                        <td class="px-4 py-3">
-                            <div class="flex items-center gap-1.5">
-                                <span class="inline-block w-1.5 h-1.5 rounded-full" style="background-color: <?= $status_color ?>"></span>
-                                <span class="text-[9px] font-black uppercase tracking-widest" style="color: <?= $status_color ?>"><?= $status_label ?></span>
-                            </div>
-                            <p class="text-[7px] text-slate-600 font-mono uppercase mt-0.5">
-                                <?= $item['pawn_ticket_no'] ? 'Linked: PT-' . str_pad($item['pawn_ticket_no'], 5, '0', STR_PAD_LEFT) : 'Unlinked' ?>
-                            </p>
-                        </td>
-                        <td class="px-4 py-3 text-right">
-                            <p class="text-xs font-black font-mono text-white">â‚±<?= number_format($item['appraised_value'], 2) ?></p>
-                        </td>
-                        <td class="px-4 py-3 text-center">
-                            <button onclick="viewItemDetails(this)" 
-                                    data-item="<?= htmlspecialchars(json_encode($item)) ?>"
-                                    class="text-slate-500 hover:text-[#00ff41] transition-colors px-2">
-                                <span class="material-symbols-outlined text-sm">visibility</span>
-                            </button>
-                        </td>
-                    </tr>
+<div class="max-w-7xl mx-auto w-full px-4 pb-12 mt-6">
+    <div class="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+        <div><h1 class="text-3xl font-black text-white tracking-tighter uppercase italic">Inventory <span class="text-purple-500">Hub</span></h1></div>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <a href="wholesale_lots.php" class="bg-orange-500/10 text-orange-500 border border-orange-500/30 hover:bg-orange-500 hover:text-black px-4 py-2 text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">inventory_2</span> Wholesale Lots
+            </a>
+            <input type="text" id="searchInput" placeholder="SEARCH ASSETS..." class="bg-[#141518] border border-white/10 text-white text-xs px-4 py-2 outline-none uppercase font-bold tracking-widest w-full sm:w-64 focus:border-purple-500 transition-colors">
+            <form method="GET" class="flex">
+                <select name="loc" onchange="this.form.submit()" class="bg-[#141518] border border-white/10 text-white text-xs px-4 py-2 outline-none uppercase font-bold tracking-widest cursor-pointer hover:border-purple-500 transition-colors w-full">
+                    <option value="ALL">ALL VAULTS & LOCATIONS</option>
+                    <?php foreach($locations as $loc): ?>
+                        <option value="<?= htmlspecialchars($loc) ?>" <?= $selected_loc === $loc ? 'selected' : '' ?>><?= htmlspecialchars($loc) ?></option>
                     <?php endforeach; ?>
-                <?php endif; ?>
+                </select>
+            </form>
+        </div>
+    </div>
 
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <button onclick="switchTab('tab-vault')" class="tab-btn active bg-white/[0.02] border border-white/5 p-4 border-t-2 border-t-purple-500 text-left transition-all">
+            <p class="text-[9px] font-black text-purple-500 uppercase tracking-widest">In Vault</p>
+            <div class="mt-2 flex flex-col">
+                <span class="text-2xl font-black text-white"><?= $stats['vault']['count'] ?> ITEMS</span>
+                <span class="text-[10px] text-slate-400 font-mono">₱<?= number_format($stats['vault']['value'], 2) ?> TOTAL</span>
+            </div>
+        </button>
+        <button onclick="switchTab('tab-rematado')" class="tab-btn bg-[#141518] border border-white/5 p-4 border-t-2 border-t-red-500 text-left hover:bg-white/[0.02] transition-all opacity-60">
+            <p class="text-[9px] font-black text-red-500 uppercase tracking-widest">Liquidation</p>
+            <div class="mt-2 flex flex-col">
+                <span class="text-2xl font-black text-white"><?= $stats['rematado']['count'] ?> ITEMS</span>
+                <span class="text-[10px] text-slate-400 font-mono">₱<?= number_format($stats['rematado']['value'], 2) ?> TOTAL</span>
+            </div>
+        </button>
+        <button onclick="switchTab('tab-retail')" class="tab-btn bg-[#141518] border border-white/5 p-4 border-t-2 border-t-[#00ff41] text-left hover:bg-white/[0.02] transition-all opacity-60">
+            <p class="text-[9px] font-black text-[#00ff41] uppercase tracking-widest">Retail Floor</p>
+            <div class="mt-2 flex flex-col">
+                <span class="text-2xl font-black text-white"><?= $stats['retail']['count'] ?> ITEMS</span>
+                <span class="text-[10px] text-slate-400 font-mono">₱<?= number_format($stats['retail']['value'], 2) ?> TOTAL</span>
+            </div>
+        </button>
+        <button onclick="switchTab('tab-redeemed')" class="tab-btn bg-[#141518] border border-white/5 p-4 border-t-2 border-t-slate-500 text-left hover:bg-white/[0.02] transition-all opacity-60">
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Redeemed</p>
+            <div class="mt-2 flex flex-col">
+                <span class="text-2xl font-black text-white"><?= $stats['redeemed']['count'] ?> ITEMS</span>
+                <span class="text-[10px] text-slate-400 font-mono">₱<?= number_format($stats['redeemed']['value'], 2) ?> TOTAL</span>
+            </div>
+        </button>
+    </div>
+
+    <div id="tab-vault" class="tab-content block">
+        <form action="process_inventory.php" method="POST" class="bg-[#141518] border border-white/5 rounded-sm p-4">
+            <input type="hidden" name="action" value="bulk_move">
+            <div class="flex justify-between items-center mb-4 bg-black/20 p-3 border border-white/5">
+                <label class="flex items-center gap-2 text-xs text-slate-400 uppercase font-bold cursor-pointer"><input type="checkbox" id="selectAll" class="accent-purple-500"> Select All</label>
+                <div class="flex gap-2">
+                    <select name="new_location" class="bg-black text-white text-xs px-3 py-1 border border-white/10 outline-none uppercase" required>
+                        <option value="" disabled selected>-- DESTINATION --</option>
+                        <?php foreach($locations as $loc): ?><option value="<?= htmlspecialchars($loc) ?>"><?= htmlspecialchars($loc) ?></option><?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="bg-purple-500/10 text-purple-400 border border-purple-500/30 hover:bg-purple-500 hover:text-white px-4 py-1 text-[10px] font-black uppercase tracking-widest transition-colors">MOVE</button>
+                </div>
+            </div>
+            <table class="w-full text-left text-[10px] uppercase font-mono text-slate-300">
+                <tbody class="divide-y divide-white/5">
+                    <?php if(empty($in_vault)): ?><tr><td colspan="5" class="p-4 text-center opacity-50 italic">No items found.</td></tr><?php endif; ?>
+                    <?php foreach($in_vault as $item): ?>
+                        <tr class="hover:bg-white/[0.02] searchable-row">
+                            <td class="p-3 w-10"><input type="checkbox" name="item_ids[]" value="<?= $item['item_id'] ?>" class="accent-purple-500 vault-cb"></td>
+                            <td class="p-3 text-purple-400 font-bold">PT-<?= $item['pawn_ticket_no'] ?? 'N/A' ?></td>
+                            <td class="p-3 font-bold text-white"><?= htmlspecialchars($item['item_name']) ?> <span class="hidden"><?= htmlspecialchars($item['item_description'] ?? '') ?></span></td>
+                            <td class="p-3 text-[9px] text-purple-500/80"><?= htmlspecialchars($item['storage_location'] ?? 'UNASSIGNED') ?></td>
+                            <td class="p-3 text-right"><button type="button" onclick='openSidebar(<?= json_encode($item) ?>)' class="border border-white/10 px-2 py-1 hover:bg-white/10">VIEW</button></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </form>
+    </div>
+
+    <div id="tab-rematado" class="tab-content hidden bg-red-500/5 border border-red-500/20 rounded-sm">
+        <table class="w-full text-left text-[10px] uppercase font-mono text-slate-300">
+            <tbody class="divide-y divide-red-500/10">
+                <?php if(empty($rematado)): ?><tr><td colspan="5" class="p-4 text-center opacity-50 italic">Pipeline is clear.</td></tr><?php endif; ?>
+                <?php foreach($rematado as $item): ?>
+                    <tr class="hover:bg-red-500/10 searchable-row">
+                        <td class="p-4 text-red-400 font-bold">PT-<?= $item['pawn_ticket_no'] ?? 'N/A' ?></td>
+                        <td class="p-4 font-bold text-white"><?= htmlspecialchars($item['item_name']) ?> <span class="hidden"><?= htmlspecialchars($item['item_description'] ?? '') ?></span></td>
+                        <td class="p-4 opacity-50">Exp: <?= date('M d', strtotime($item['expiry_date'] ?? 'now')) ?></td>
+                        <td class="p-4 text-right">
+                            <form action="process_inventory.php" method="POST" class="flex items-center justify-end gap-3">
+                                <input type="hidden" name="action" value="move_to_retail">
+                                <input type="hidden" name="item_id" value="<?= $item['item_id'] ?>">
+
+                                <div class="flex items-center gap-2" id="markup-group-<?= $item['item_id'] ?>" data-base-val="<?= htmlspecialchars($item['appraised_value']) ?>">
+                                    
+                                    <div class="relative flex items-center">
+                                        <input type="number" id="price-<?= $item['item_id'] ?>" name="retail_price" value="<?= htmlspecialchars($item['appraised_value'] ?? '') ?>" placeholder="PRICE ₱" class="bg-[#0a0b0d] border border-white/10 text-[#00ff41] pl-3 pr-6 py-1.5 w-32 rounded-sm outline-none focus:border-[#00ff41]/50 focus:bg-black transition-all font-bold font-mono text-xs shadow-inner text-right" required step="0.01">
+                                        <button type="button" onclick="clearPrice('<?= $item['item_id'] ?>')" class="absolute right-2 text-slate-500 hover:text-red-500 font-bold text-[10px] transition-colors" title="Clear Price">✕</button>
+                                    </div>
+                                    
+                                    <div class="flex items-center gap-1 bg-black/40 border border-white/5 p-1 rounded-sm">
+                                        <button type="button" onclick="applyMarkup('<?= $item['item_id'] ?>', 20)" class="text-[9px] font-bold text-slate-400 hover:text-white hover:bg-white/10 px-2 py-1 rounded transition-colors">+20%</button>
+                                        <button type="button" onclick="applyMarkup('<?= $item['item_id'] ?>', 50)" class="text-[9px] font-bold text-slate-400 hover:text-white hover:bg-white/10 px-2 py-1 rounded transition-colors">+50%</button>
+                                        
+                                        <div class="flex items-center border-l border-white/10 pl-1 ml-1 gap-1">
+                                            <input type="number" id="custom-pct-<?= $item['item_id'] ?>" oninput="applyCustomMarkup('<?= $item['item_id'] ?>')" placeholder="CSTM %" class="w-14 bg-transparent text-[9px] text-slate-300 text-center outline-none border-b border-white/10 focus:border-[#00ff41] py-0.5 placeholder:text-slate-600">
+                                        </div>
+
+                                        <button type="button" onclick="resetMarkup('<?= $item['item_id'] ?>')" class="text-[9px] font-bold text-red-500/80 hover:text-white hover:bg-red-500 px-2 py-1 rounded transition-colors border-l border-white/10 ml-1">RESET</button>
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded-sm font-black transition-colors text-[10px] tracking-widest whitespace-nowrap">MOVE TO RETAIL</button>
+                            </form>
+                        </td>
+                        <td class="p-4 text-right w-16"><button type="button" onclick='openSidebar(<?= json_encode($item) ?>)' class="border border-red-500/30 text-red-400 px-2 py-1 hover:bg-red-500/20 transition-colors">VIEW</button></td>
+                    </tr>
+                <?php endforeach; ?>
             </tbody>
         </table>
+    </div>
+
+    <div id="tab-retail" class="tab-content hidden bg-[#141518] border border-[#00ff41]/20 rounded-sm">
         
-        <div class="bg-[#0f1115] border-t border-white/5 px-4 py-3 flex justify-between items-center">
-            <span class="text-[9px] font-mono text-slate-500 uppercase tracking-widest">Showing <?= count($inventory_items) ?> records</span>
+        <form id="retail-bulk-form" action="process_inventory.php" method="POST" class="hidden">
+            <input type="hidden" name="action" value="bulk_assign_lot">
+        </form>
+
+        <div class="flex justify-between items-center bg-black/40 p-3 border-b border-white/5">
+            <label class="flex items-center gap-2 text-xs text-slate-400 uppercase font-bold cursor-pointer">
+                <input type="checkbox" id="selectAllRetail" class="accent-orange-500"> Select All
+            </label>
+            <div class="flex gap-2">
+        <select name="lot_name" form="retail-bulk-form" class="bg-black text-white text-xs px-3 py-1 border border-white/10 outline-none uppercase focus:border-orange-500 w-40" required>
+            <option value="" disabled selected>-- SELECT LOT --</option>
+            
+            <?php if (!empty($retail_lots_list)): ?>
+                <?php foreach($retail_lots_list as $lot): ?>
+                    <option value="<?= htmlspecialchars($lot) ?>"><?= htmlspecialchars($lot) ?></option>
+                <?php endforeach; ?>
+            <?php endif; ?>
+            
+        </select>
+                <button type="submit" form="retail-bulk-form" class="bg-orange-500/10 text-orange-400 border border-orange-500/30 hover:bg-orange-500 hover:text-black px-4 py-1 text-[10px] font-black uppercase tracking-widest transition-colors">ASSIGN TO LOT</button>
+            </div>
         </div>
+
+        <table class="w-full text-left text-[10px] uppercase font-mono text-slate-300">
+            <tbody class="divide-y divide-white/5">
+                <?php if(empty($for_sale)): ?><tr><td colspan="5" class="p-4 text-center opacity-50 italic">Showroom empty.</td></tr><?php endif; ?>
+                <?php foreach($for_sale as $item): ?>
+                    <tr class="hover:bg-white/[0.02] searchable-row">
+                        <td class="p-3 w-10">
+                            <input type="checkbox" name="item_ids[]" value="<?= $item['item_id'] ?>" form="retail-bulk-form" class="accent-orange-500 retail-cb">
+                        </td>
+                        <td class="p-4 text-slate-400 font-bold">PT-<?= $item['pawn_ticket_no'] ?? 'N/A' ?></td>
+                        <td class="p-4 font-bold text-white">
+                            <?= htmlspecialchars($item['item_name']) ?>
+                            
+                            <?php if(!empty($item['lot_name'])): ?>
+                                <span class="ml-2 bg-orange-500/10 text-orange-400 px-2 py-0.5 rounded-sm border border-orange-500/20 text-[8px] tracking-widest uppercase align-middle">
+                                    LOT: <?= htmlspecialchars($item['lot_name']) ?>
+                                </span>
+                            <?php endif; ?>
+                            
+                            <span class="hidden"><?= htmlspecialchars($item['item_description'] ?? '') ?></span>
+                        </td>
+                        <td class="p-4 text-[#00ff41]">₱<?= number_format($item['retail_price'] ?? ($item['appraised_value']*1.5), 2) ?></td>
+                        <td class="p-4 text-right flex justify-end gap-2">
+                            <form action="process_inventory.php" method="POST">
+                                <input type="hidden" name="action" value="mark_sold">
+                                <input type="hidden" name="item_id" value="<?= $item['item_id'] ?>">
+                                <button type="submit" class="text-[#00ff41] border border-[#00ff41]/30 px-3 py-1 hover:bg-[#00ff41] hover:text-black font-black transition-colors">SOLD</button>
+                            </form>
+                            <button type="button" onclick='openSidebar(<?= json_encode($item) ?>)' class="border border-white/10 px-2 py-1 hover:bg-white/10">VIEW</button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <div id="tab-redeemed" class="tab-content hidden bg-[#141518] border border-white/5 rounded-sm opacity-60">
+        <table class="w-full text-left text-[10px] uppercase font-mono text-slate-400">
+            <tbody class="divide-y divide-white/5">
+                <?php if(empty($redeemed)): ?><tr><td colspan="3" class="p-4 text-center italic">No records.</td></tr><?php endif; ?>
+                <?php foreach(array_slice($redeemed, 0, 50) as $item): ?>
+                    <tr class="hover:bg-white/[0.02] searchable-row">
+                        <td class="p-4 font-bold">PT-<?= $item['pawn_ticket_no'] ?? 'N/A' ?></td>
+                        <td class="p-4 font-bold"><?= htmlspecialchars($item['item_name']) ?> <span class="hidden"><?= htmlspecialchars($item['item_description'] ?? '') ?></span></td>
+                        <td class="p-4 text-right w-16"><button type="button" onclick='openSidebar(<?= json_encode($item) ?>)' class="border border-white/10 px-2 py-1 hover:bg-white/10">VIEW</button></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 
-<div id="itemModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center backdrop-blur-sm p-4">
-    <div class="bg-[#141518] border border-white/10 w-full max-w-2xl shadow-2xl relative">
+<div id="slideOverlay" class="fixed inset-0 bg-black/60 hidden z-40 transition-opacity opacity-0" onclick="closeSidebar()"></div>
+<div id="slidePanel" class="fixed inset-y-0 right-0 w-80 bg-[#0a0b0d] border-l border-white/10 transform translate-x-full transition-transform duration-300 z-50 shadow-2xl flex flex-col">
+    <div class="p-6 border-b border-white/10 flex justify-between items-center bg-[#141518]">
+        <h3 class="text-white font-black text-xs uppercase tracking-widest">Asset Details</h3>
+        <button onclick="closeSidebar()" class="text-slate-500 hover:text-white"><span class="material-symbols-outlined text-lg">close</span></button>
+    </div>
+    <div class="p-6 space-y-6 flex-1 overflow-y-auto">
+        <img id="side-img" src="" class="w-full h-48 object-cover rounded-sm border border-white/10 hidden bg-[#141518]" alt="Asset Image">
         
-        <div class="flex justify-between items-center p-5 border-b border-white/5 bg-[#0a0b0d]">
-            <div class="flex items-center gap-3">
-                <span class="material-symbols-outlined text-[#ff6b00] text-2xl">policy</span>
-                <div>
-                    <h3 class="text-white font-black uppercase tracking-widest text-sm">Asset Manifest</h3>
-                    <p class="text-[9px] text-slate-500 font-mono uppercase" id="modal_hash">INV-XXXXXXXX</p>
-                </div>
-            </div>
-            <button onclick="closeItemModal()" class="text-slate-500 hover:text-red-500 transition-colors">
-                <span class="material-symbols-outlined">close</span>
-            </button>
-        </div>
-
-        <div class="p-6 space-y-6">
-            
-            <div class="flex justify-between items-start">
-                <div>
-                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Asset Nomenclature</p>
-                    <h2 class="text-xl font-black text-white uppercase font-display" id="modal_name">--</h2>
-                </div>
-                <div class="text-right">
-                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">System Appraisal</p>
-                    <p class="text-xl font-black text-[#00ff41] font-mono" id="modal_appraisal">â‚±0.00</p>
-                </div>
-            </div>
-
-            <div class="bg-[#0a0b0d] border border-purple-500/20 p-4 border-l-2 border-l-purple-500">
-                <p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[12px]">memory</span> Compiled Specifications
-                </p>
-                <p class="text-xs text-slate-300 font-mono leading-relaxed" id="modal_specs">--</p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-[#0a0b0d] border border-white/5 p-4">
-                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Serial Number / IMEI</p>
-                    <p class="text-xs text-white font-mono" id="modal_serial">--</p>
-                </div>
-                <div class="bg-[#0a0b0d] border border-white/5 p-4">
-                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Weight (Grams)</p>
-                    <p class="text-xs text-white font-mono" id="modal_weight">--</p>
-                </div>
-                <div class="bg-[#0a0b0d] border border-white/5 p-4">
-                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Condition Record</p>
-                    <p class="text-xs text-white uppercase" id="modal_condition">--</p>
-                </div>
-                <div class="bg-[#0a0b0d] border border-white/5 p-4">
-                    <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Storage Sector</p>
-                    <p class="text-xs text-white font-mono" id="modal_location">--</p>
-                </div>
-            </div>
-            
+        <div><p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Item Name</p><p id="side-name" class="text-white font-mono text-sm font-bold">--</p></div>
+        <div><p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Description</p><p id="side-desc" class="text-slate-300 font-mono text-[10px]">--</p></div>
+        <div class="grid grid-cols-2 gap-4">
+            <div><p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Appraised</p><p id="side-val" class="text-purple-400 font-mono font-bold text-xs">--</p></div>
+            <div><p class="text-[9px] text-slate-500 font-bold uppercase mb-1">Status</p><p id="side-status" class="text-white font-mono font-bold text-[10px] uppercase">--</p></div>
         </div>
     </div>
 </div>
 
 <script>
-    // JS Function to populate and open the Data Modal
-    function viewItemDetails(btnElement) {
-        // Parse the JSON data hidden in the button attribute
-        const item = JSON.parse(btnElement.getAttribute('data-item'));
-        
-        // Populate Modal Fields
-        document.getElementById('modal_hash').innerText = 'INV-' + item.item_id.substring(0, 8).toUpperCase();
-        document.getElementById('modal_name').innerText = item.item_name || 'UNKNOWN ASSET';
-        
-        const fmt = (num) => parseFloat(num).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        document.getElementById('modal_appraisal').innerText = 'â‚±' + fmt(item.appraised_value);
-        
-        document.getElementById('modal_specs').innerText = item.item_description || 'No specs recorded.';
-        document.getElementById('modal_serial').innerText = item.serial_number || 'N/A';
-        document.getElementById('modal_weight').innerText = item.weight_grams ? item.weight_grams + 'g' : 'N/A';
-        document.getElementById('modal_condition').innerText = item.item_condition || 'N/A';
-        document.getElementById('modal_location').innerText = item.storage_location || 'UNASSIGNED';
+document.getElementById('searchInput').addEventListener('keyup', function() {
+    const query = this.value.toLowerCase();
+    const rows = document.querySelectorAll('.searchable-row');
+    rows.forEach(row => { row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none'; });
+});
 
-        // Show Modal
-        document.getElementById('itemModal').classList.remove('hidden');
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(el => { el.classList.remove('bg-white/[0.02]', 'opacity-100'); el.classList.add('opacity-60'); });
+    document.getElementById(tabId).classList.remove('hidden');
+    event.currentTarget.classList.add('bg-white/[0.02]', 'opacity-100');
+    event.currentTarget.classList.remove('opacity-60');
+}
+
+const selectAll = document.getElementById('selectAll');
+if(selectAll) selectAll.addEventListener('change', e => document.querySelectorAll('.vault-cb').forEach(cb => cb.checked = e.target.checked));
+
+const selectAllRetail = document.getElementById('selectAllRetail');
+if(selectAllRetail) selectAllRetail.addEventListener('change', e => document.querySelectorAll('.retail-cb').forEach(cb => cb.checked = e.target.checked));
+
+function openSidebar(data) {
+    document.getElementById('side-name').innerText = data.item_name || 'Unknown';
+    document.getElementById('side-desc').innerText = data.item_description || 'No description provided.';
+    document.getElementById('side-val').innerText = '₱' + parseFloat(data.appraised_value || 0).toLocaleString();
+    document.getElementById('side-status').innerText = (data.item_status || 'Unknown').replace('_', ' ');
+
+    const imgEl = document.getElementById('side-img');
+    if (data.item_image) {
+        imgEl.src = data.item_image;
+        imgEl.classList.remove('hidden');
+    } else {
+        imgEl.src = '';
+        imgEl.classList.add('hidden');
     }
 
-    function closeItemModal() {
-        document.getElementById('itemModal').classList.add('hidden');
+    const overlay = document.getElementById('slideOverlay'), panel = document.getElementById('slidePanel');
+    overlay.classList.remove('hidden');
+    setTimeout(() => { overlay.classList.remove('opacity-0'); panel.classList.remove('translate-x-full'); }, 10);
+}
+
+function closeSidebar() {
+    document.getElementById('slidePanel').classList.add('translate-x-full');
+    document.getElementById('slideOverlay').classList.add('opacity-0');
+    setTimeout(() => document.getElementById('slideOverlay').classList.add('hidden'), 300);
+}
+
+// --- Interactive Markup Calculator Logic ---
+
+// Clear the price input completely
+function clearPrice(itemId) {
+    const input = document.getElementById('price-' + itemId);
+    input.value = '';
+    input.focus(); // Keep the cursor in the box so they can type immediately
+}
+
+// Apply a preset or custom markup percentage
+function applyMarkup(itemId, percentage) {
+    const group = document.getElementById('markup-group-' + itemId);
+    const input = document.getElementById('price-' + itemId);
+    const baseVal = parseFloat(group.getAttribute('data-base-val')) || 0;
+    
+    // Calculate new price: Base + (Base * Percentage)
+    const newPrice = baseVal + (baseVal * (percentage / 100));
+    input.value = newPrice.toFixed(2);
+    
+    // Visual feedback flash
+    input.classList.add('bg-[#00ff41]/20');
+    setTimeout(() => input.classList.remove('bg-[#00ff41]/20'), 150);
+}
+
+// Read the custom input box and trigger the math instantly
+function applyCustomMarkup(itemId) {
+    const pctInput = document.getElementById('custom-pct-' + itemId);
+    const percentage = parseFloat(pctInput.value);
+    
+    if (!isNaN(percentage)) {
+        applyMarkup(itemId, percentage);
+    } else if (pctInput.value === '') {
+        // If they backspace the whole custom %, snap back to original value safely
+        resetMarkup(itemId);
     }
+}
+
+// Deactivate/Revert back to the original database value
+function resetMarkup(itemId) {
+    const group = document.getElementById('markup-group-' + itemId);
+    const input = document.getElementById('price-' + itemId);
+    const customInput = document.getElementById('custom-pct-' + itemId);
+    const baseVal = parseFloat(group.getAttribute('data-base-val')) || 0;
+    
+    input.value = baseVal.toFixed(2);
+    if(customInput) customInput.value = ''; // Clear the custom box
+    
+    // Visual feedback flash (red for reset)
+    input.classList.add('bg-red-500/20');
+    setTimeout(() => input.classList.remove('bg-red-500/20'), 150);
+}
 </script>
 
 <?php include 'includes/footer.php'; ?>

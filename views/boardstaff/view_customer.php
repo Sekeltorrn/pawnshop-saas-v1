@@ -66,6 +66,10 @@ try {
                         ]);
                         $stmt = $pdo->prepare("UPDATE profile_change_requests SET status = 'approved', admin_notes = 'Approved by Staff', updated_at = NOW() WHERE request_id = ?");
                         $stmt->execute([$req_id]);
+
+                        // AUDIT LOG: Profile Mutation Approved
+                        record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'profile_change_requests', $req_id, ['status' => 'pending'], ['status' => 'approved']);
+                        
                         $pdo->commit();
                         $msg = "Mutation Sequence: COMMIT_SUCCESS";
                     } else { $pdo->rollBack(); }
@@ -76,6 +80,10 @@ try {
             if ($req_id) {
                 $stmt = $pdo->prepare("UPDATE profile_change_requests SET status = 'rejected', updated_at = NOW() WHERE request_id = ?");
                 $stmt->execute([$req_id]);
+                
+                // AUDIT LOG: Profile Mutation Rejected
+                record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'profile_change_requests', $req_id, ['status' => 'pending'], ['status' => 'rejected']);
+                
                 $msg = "Mutation Sequence: REJECTED";
             }
         }
@@ -83,6 +91,10 @@ try {
             $reason = $_POST['rejection_reason'] ?? 'Documents did not meet scanning requirements.';
             $stmt = $pdo->prepare("UPDATE customers SET status = 'unverified', id_photo_front_url = NULL, id_photo_back_url = NULL, rejection_reason = ?, updated_at = NOW() WHERE customer_id = ?");
             $stmt->execute([$reason, $customer_id]);
+            
+            // AUDIT LOG: KYC Rejection
+            record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'customers', $customer_id, ['status' => 'pending'], ['status' => 'unverified', 'rejection_reason' => $reason]);
+            
             $msg = "Identity Protocol: REJECTED & RESET";
         } elseif ($action === 'approve') {
             $stmt = $pdo->prepare("UPDATE customers SET 
@@ -93,6 +105,10 @@ try {
                 $_POST['first_name'], $_POST['middle_name'], $_POST['last_name'],
                 $_POST['contact_no'], $_POST['address'], $_POST['birthday'], $customer_id
             ]);
+            
+            // AUDIT LOG: KYC Approval
+            record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'customers', $customer_id, ['status' => 'pending'], ['status' => 'verified']);
+            
             header("Location: view_customer.php?id=$customer_id&status=approved");
             exit();
         } elseif ($action === 'save_fields') {
