@@ -94,24 +94,37 @@ if (isset($_FILES['id_back'])) {
 
 // 5. Store in the Public "Lobby" Table
 try {
-    $pdo->exec("SET search_path TO public");
-    
-    // Using ON CONFLICT just in case an employee tries to upload to the same session twice
+    // Explicitly target the table with the public prefix to avoid pathing issues
     $stmt = $pdo->prepare("
-        INSERT INTO kyc_upload_sessions (session_id, schema_name, front_url, back_url) 
-        VALUES (?, ?, ?, ?)
+        INSERT INTO public.kyc_upload_sessions (session_id, schema_name, front_url, back_url, created_at) 
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT (session_id) DO UPDATE 
         SET front_url = EXCLUDED.front_url, 
             back_url = EXCLUDED.back_url, 
+            schema_name = EXCLUDED.schema_name,
             created_at = CURRENT_TIMESTAMP
     ");
-    $stmt->execute([$session_id, $schema_name, $front_url, $back_url]);
+    
+    $success = $stmt->execute([$session_id, $schema_name, $front_url, $back_url]);
 
-    echo json_encode([
-        'success' => true, 
-        'message' => 'Secure hand-off complete.'
-    ]);
+    if ($success) {
+        echo json_encode([
+            'success' => true, 
+            'message' => 'Secure hand-off complete.',
+            'session' => $session_id
+        ]);
+    } else {
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Database execution failed but no exception thrown.'
+        ]);
+    }
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    // Detailed error for debugging the capacity exhaustion or permission issues
+    echo json_encode([
+        'success' => false, 
+        'message' => 'DB Error: ' . $e->getMessage(),
+        'code' => $e->getCode()
+    ]);
 }
 ?>
