@@ -69,18 +69,6 @@ try {
         exit;
     }
 
-    // C. Add Walk-In
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_walk_in'])) {
-        $first_name = trim($_POST['first_name']);
-        $last_name = trim($_POST['last_name']);
-        $contact = trim($_POST['contact_no']);
-        $clean_name = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $first_name . $last_name));
-        $generated_email = $clean_name . rand(100, 999) . '@walkin.local';
-        $stmt = $pdo->prepare("INSERT INTO customers (first_name, last_name, email, contact_no, is_walk_in, status) VALUES (?, ?, ?, ?, TRUE, 'verified')");
-        $stmt->execute([$first_name, $last_name, $generated_email, $contact]);
-        header("Location: customers.php?msg=Walk-In Added");
-        exit;
-    }
 
     // DATA FETCHING
     // 1. Verification Queue (Strict: Pending + Has Documents)
@@ -112,10 +100,9 @@ include 'includes/header.php';
             <h1 class="text-4xl font-headline font-bold text-on-surface uppercase tracking-tighter italic">Customer <span class="text-tertiary-dim italic">Hub</span></h1>
             <p class="text-[10px] font-headline font-medium text-on-surface-variant uppercase tracking-[0.2em] mt-2 opacity-50 italic">Centralized node for identity management and request escalation</p>
         </div>
-        <button onclick="toggleAddWalkinModal()" class="inline-flex items-center gap-2 px-8 py-4 bg-tertiary-dim text-black font-headline font-bold uppercase text-[11px] tracking-widest shadow-[0_0_20px_rgba(0,219,236,0.15)] hover:bg-black hover:text-tertiary-dim transition-all rounded-sm border border-tertiary-dim">
-            <span class="material-symbols-outlined text-sm">person_add</span>
-            PROVISION WALK-IN
-        </button>
+        <a href="create_walkin.php" class="bg-primary/20 hover:bg-primary/30 text-primary px-4 py-2 rounded text-sm font-bold flex items-center gap-2 transition-colors">
+            <span class="material-symbols-outlined text-sm">person_add</span> NEW_WALK_IN
+        </a>
     </div>
 
     <!-- HUB TABS -->
@@ -279,26 +266,5 @@ include 'includes/header.php';
     </div>
 </main>
 
-<div id="addWalkinModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/80 backdrop-blur-sm px-6">
-    <div class="bg-surface-container-low border border-outline-variant/20 p-10 w-full max-w-xl rounded-sm shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-        <h2 class="text-3xl font-headline font-bold text-on-surface uppercase tracking-tighter italic mb-8">Provision <span class="text-tertiary-dim">Walk-In</span></h2>
-        <form method="POST" class="space-y-6">
-            <input type="hidden" name="add_walk_in" value="1">
-            <div class="grid grid-cols-2 gap-4">
-                <input type="text" name="first_name" required placeholder="FIRST_NAME" class="w-full bg-surface-container-highest border border-outline-variant/10 p-4 text-[12px] font-headline font-black outline-none focus:border-tertiary-dim uppercase tracking-widest rounded-sm">
-                <input type="text" name="last_name" required placeholder="LAST_NAME" class="w-full bg-surface-container-highest border border-outline-variant/10 p-4 text-[12px] font-headline font-black outline-none focus:border-tertiary-dim uppercase tracking-widest rounded-sm">
-            </div>
-            <input type="text" name="contact_no" required placeholder="MOBILE_09XXXXXXXXX" class="w-full bg-surface-container-highest border border-outline-variant/10 p-4 text-[12px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest text-primary rounded-sm">
-            <div class="flex gap-4 pt-4">
-                <button type="button" onclick="toggleAddWalkinModal()" class="flex-1 py-4 text-[11px] font-headline font-bold text-on-surface-variant uppercase tracking-widest hover:text-on-surface transition-all">ABORT_SYNC</button>
-                <button type="submit" class="flex-1 py-4 bg-tertiary-dim text-black font-headline font-black uppercase tracking-[0.3em] text-[11px] rounded-sm hover:opacity-80 transition-all">GENERATE_IDENTITY</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-    function toggleAddWalkinModal() { document.getElementById('addWalkinModal').classList.toggle('hidden'); }
-</script>
 
 <?php include 'includes/footer.php'; ?>

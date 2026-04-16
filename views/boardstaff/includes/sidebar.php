@@ -33,7 +33,7 @@ $inactive_link_class = "border-transparent text-on-surface-variant/40 hover:bg-s
             <span>Payments</span>
         </a>
 
-        <a href="customers.php" class="<?= $base_link_class ?> <?= in_array($current_page, ['customers.php', 'view_customer.php']) ? $active_link_class : $inactive_link_class ?>">
+        <a href="customers.php" class="<?= $base_link_class ?> <?= in_array($current_page, ['customers.php', 'view_customer.php', 'create_walkin.php']) ? $active_link_class : $inactive_link_class ?>">
             <span class="material-symbols-outlined text-[18px]">group</span>
             <span>Identity</span>
         </a>

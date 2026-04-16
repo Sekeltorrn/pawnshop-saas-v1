@@ -128,19 +128,8 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
                 </h3>
                     
                 <div class="space-y-8">
-                    <div class="flex gap-8 border-b border-outline-variant/10 pb-6">
-                        <label class="cursor-pointer flex items-center gap-3 text-[11px] font-headline font-bold uppercase text-on-surface-variant hover:text-primary transition-colors">
-                            <input type="radio" name="customer_type" value="existing" class="accent-primary w-4 h-4" <?= (!isset($draft['customer_type']) || $draft['customer_type'] === 'existing') ? 'checked' : '' ?> onchange="toggleCustomerForm('existing')">
-                            Search Verified Database
-                        </label>
-                        <label class="cursor-pointer flex items-center gap-3 text-[11px] font-headline font-bold uppercase text-on-surface-variant hover:text-tertiary-dim transition-colors">
-                            <input type="radio" name="customer_type" value="new" class="accent-tertiary-dim w-4 h-4" <?= (isset($draft['customer_type']) && $draft['customer_type'] === 'new') ? 'checked' : '' ?> onchange="toggleCustomerForm('new')">
-                            Induct New Walk-In
-                        </label>
-                    </div>
-
-                    <div id="existing_customer_view" class="block space-y-6">
-                        <select name="customer_id" id="customer_select" onchange="updateCustomerInfo()" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[13px] font-headline font-bold outline-none focus:border-primary/50 transition-all rounded-sm uppercase tracking-widest">
+                    <div class="space-y-6">
+                        <select name="customer_id" id="customer_select" onchange="updateCustomerInfo()" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[13px] font-headline font-bold outline-none focus:border-primary/50 transition-all rounded-sm uppercase tracking-widest" required>
                             <option value="" disabled <?= !isset($draft['customer_id']) ? 'selected' : '' ?>>-- ACCESSING VERIFIED CLIENT DATABASE --</option>
                             <?php foreach ($customer_data as $id => $c): ?>
                                 <option value="<?= $id ?>" <?= (isset($draft['customer_id']) && $draft['customer_id'] == $id) ? 'selected' : '' ?>><?= strtoupper(htmlspecialchars($c['name'])) ?></option>
@@ -152,31 +141,6 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
                                 <div><p class="text-[9px] font-headline font-bold text-on-surface-variant uppercase tracking-widest opacity-50 mb-2">Subject Name</p><p class="text-[13px] font-headline font-bold text-on-surface tracking-tight" id="info_name">--</p></div>
                                 <div><p class="text-[9px] font-headline font-bold text-on-surface-variant uppercase tracking-widest opacity-50 mb-2">Primary Comm Link</p><p class="text-[13px] font-headline font-bold text-primary tracking-widest" id="info_contact">--</p></div>
                                 <div><p class="text-[9px] font-headline font-bold text-on-surface-variant uppercase tracking-widest opacity-50 mb-2">Clearance Status</p><p class="text-[11px] font-headline font-bold text-primary uppercase tracking-widest" id="info_id">--</p></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="new_customer_view" class="hidden space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <input type="text" name="new_first_name" value="<?= htmlspecialchars($draft['new_first_name'] ?? '') ?>" placeholder="FIRST NAME" class="bg-surface-container-highest border border-outline-variant/20 p-4 text-on-surface text-[12px] font-headline font-bold outline-none focus:border-tertiary-dim/50 rounded-sm uppercase tracking-widest">
-                            <input type="text" name="new_last_name" value="<?= htmlspecialchars($draft['new_last_name'] ?? '') ?>" placeholder="LAST NAME" class="bg-surface-container-highest border border-outline-variant/20 p-4 text-on-surface text-[12px] font-headline font-bold outline-none focus:border-tertiary-dim/50 rounded-sm uppercase tracking-widest">
-                            <input type="text" name="new_phone" value="<?= htmlspecialchars($draft['new_phone'] ?? '') ?>" placeholder="09XX-XXX-XXXX" class="bg-surface-container-highest border border-outline-variant/20 p-4 text-primary text-[12px] font-headline font-bold outline-none focus:border-primary/50 rounded-sm tracking-widest">
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-surface-container-lowest border border-tertiary-dim/10 p-6 relative rounded-sm">
-                            <div class="absolute top-0 left-0 w-1.5 h-full bg-tertiary-dim opacity-50"></div>
-                            <div>
-                                <label class="text-[10px] font-headline font-bold text-tertiary-dim uppercase block mb-3 tracking-widest">ID Authentication</label>
-                                <select name="new_id_type" class="w-full bg-surface-container-highest border border-outline-variant/10 p-4 text-on-surface text-[12px] font-headline font-bold outline-none focus:border-tertiary-dim/50 rounded-sm uppercase tracking-widest">
-                                    <?php $id_opt = $draft['new_id_type'] ?? ''; ?>
-                                    <option <?= $id_opt == "Driver's License" ? 'selected' : '' ?>>Driver's License</option>
-                                    <option <?= $id_opt == "National ID (PhilSys)" ? 'selected' : '' ?>>National ID (PhilSys)</option>
-                                    <option <?= $id_opt == "Passport" ? 'selected' : '' ?>>Passport</option>
-                                    <option <?= $id_opt == "UMID" ? 'selected' : '' ?>>UMID</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[10px] font-headline font-bold text-tertiary-dim uppercase block mb-3 tracking-widest">ID Scan Upload</label>
-                                <input type="file" name="customer_id_image" accept="image/*" class="w-full text-[10px] text-on-surface-variant font-headline font-bold file:bg-surface-container-highest file:text-tertiary-dim file:border file:border-outline-variant/20 file:px-4 file:py-2.5 file:rounded-sm file:mr-4 file:uppercase file:tracking-widest cursor-pointer">
                             </div>
                         </div>
                     </div>
@@ -542,17 +506,6 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
     const GLOBAL_SETTINGS = { ltv: <?= $ltv_ratio ?>, interest_rate: <?= $month_1_rate ?>, service_charge: <?= $service_fee ?> };
     let currentMode = 'jewelry';
 
-    function toggleCustomerForm(type) {
-        if (type === 'existing') {
-            document.getElementById('existing_customer_view').style.display = 'block';
-            document.getElementById('new_customer_view').style.display = 'none';
-            document.getElementById('customer_select').required = true;
-        } else {
-            document.getElementById('existing_customer_view').style.display = 'none';
-            document.getElementById('new_customer_view').style.display = 'block';
-            document.getElementById('customer_select').required = false;
-        }
-    }
 
     function updateCustomerInfo() {
         const custId = document.getElementById('customer_select').value;
@@ -631,23 +584,11 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
     }
 
     function handleFormSubmit(e) {
-        const custType = document.querySelector('input[name="customer_type"]:checked').value;
-        if (custType === 'existing') {
-            const cid = document.getElementById('customer_select').value;
-            if (!cid) {
-                alert('PROTOCOL ERROR: Please select an existing customer from the database.');
-                e.preventDefault();
-                return false;
-            }
-        } else {
-            const fn = document.querySelector('input[name="new_first_name"]').value;
-            const ln = document.querySelector('input[name="new_last_name"]').value;
-            const ph = document.querySelector('input[name="new_phone"]').value;
-            if (!fn || !ln || !ph) {
-                alert('SECURITY VIOLATION: Walk-in customers require First Name, Last Name, and Phone Number for induction.');
-                e.preventDefault();
-                return false;
-            }
+        const cid = document.getElementById('customer_select').value;
+        if (!cid) {
+            alert('PROTOCOL ERROR: Please select a verified customer from the database.');
+            e.preventDefault();
+            return false;
         }
         finalizeItemName();
         return true;
@@ -878,11 +819,8 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         }
 
         // 1. Restore Customer Context
-        const custTypeInput = document.querySelector('input[name="customer_type"]:checked');
-        if (custTypeInput) {
-            const custType = custTypeInput.value;
-            toggleCustomerForm(custType);
-            if (custType === 'existing') updateCustomerInfo();
+        if (document.getElementById('customer_select').value) {
+            updateCustomerInfo();
         }
 
         // 2. Restore Item Modality (Jewelry vs Electronics)
@@ -951,7 +889,7 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
     }
 
     /* Ensure the search wrapper has a higher hierarchy than the info card below it */
-    #existing_customer_view {
+    .ts-wrapper {
         position: relative;
         z-index: 50; /* Higher than other dashboard elements */
     }
