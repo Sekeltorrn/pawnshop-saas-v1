@@ -15,18 +15,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'check_session') {
     header('Content-Type: application/json');
     $sess_id = $_GET['session_id'] ?? '';
     try {
-        $stmt = $pdo->prepare("SELECT front_url, back_url FROM public.kyc_upload_sessions WHERE session_id = ?");
+        // FIX: Explicitly enforce the public target to align with Supabase pooler behaviour
+        $pdo->exec("SET search_path TO public;");
+        
+        $stmt = $pdo->prepare("SELECT front_url, back_url FROM kyc_upload_sessions WHERE session_id = ?");
         $stmt->execute([$sess_id]);
         $res = $stmt->fetch(PDO::FETCH_ASSOC);
+        
         if ($res && !empty($res['front_url']) && !empty($res['back_url'])) {
             // Session fulfilled, send URLs and then delete the temporary session
             echo json_encode(['status' => 'complete', 'front' => $res['front_url'], 'back' => $res['back_url']]);
-            $pdo->prepare("DELETE FROM public.kyc_upload_sessions WHERE session_id = ?")->execute([$sess_id]);
+            $pdo->prepare("DELETE FROM kyc_upload_sessions WHERE session_id = ?")->execute([$sess_id]);
         } else {
             echo json_encode(['status' => 'pending']);
         }
     } catch (Exception $e) {
-        echo json_encode(['status' => 'error']);
+        // FIX: Return a 500 error instead of 200 generic payload to break the silent failure loop
+        http_response_code(500);
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
     exit();
 }
@@ -351,7 +357,8 @@ function generateQR() {
 
 async function checkSession(sessionId) {
     try {
-        const res = await fetch(`create_walkin.php?action=check_session&session_id=${sessionId}`);
+        // FIX: Added cache-buster to prevent the browser from caching the 'pending' JSON response
+        const res = await fetch(`create_walkin.php?action=check_session&session_id=${sessionId}&_t=${Date.now()}`, { cache: 'no-store' });
         const data = await res.json();
         
         if (data.status === 'complete') {
