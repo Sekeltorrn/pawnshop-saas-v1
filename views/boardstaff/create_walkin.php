@@ -393,11 +393,14 @@ async function checkSession(sessionId) {
             document.getElementById('front_url_input').value = data.front;
             document.getElementById('back_url_input').value = data.back;
             
-            // Render images in placeholders
-            document.getElementById('front_id_placeholder').innerHTML = `<img src="${data.front}" class="w-full h-full object-contain rounded-sm">`;
-            document.getElementById('back_id_placeholder').innerHTML = `<img src="${data.back}" class="w-full h-full object-contain rounded-sm">`;
+            // Cache-buster to force the browser to render the fresh Supabase image
+            const timestamp = new Date().getTime();
             
-            // Visual confirmation
+            // Render images with absolute positioning to prevent Flexbox from crushing them
+            document.getElementById('front_id_placeholder').innerHTML += `<img src="${data.front}?t=${timestamp}" class="absolute inset-0 w-full h-full object-cover rounded-sm z-20 shadow-lg">`;
+            document.getElementById('back_id_placeholder').innerHTML += `<img src="${data.back}?t=${timestamp}" class="absolute inset-0 w-full h-full object-cover rounded-sm z-20 shadow-lg">`;
+            
+            // Visual confirmation borders
             document.getElementById('front_id_placeholder').classList.add('border-primary', 'border-solid');
             document.getElementById('front_id_placeholder').classList.remove('border-dashed', 'border-outline-variant/20');
             document.getElementById('back_id_placeholder').classList.add('border-primary', 'border-solid');
