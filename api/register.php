@@ -132,6 +132,25 @@ try {
 
         // Capture the brand new, genuine UUID
         $real_auth_uuid = $supabase_user['id'];
+        $require_otp = true;
+
+        // ---------------------------------------------------------
+        // CRITICAL FIX: MANUALLY TRIGGER THE OTP EMAIL DISPATCH
+        // ---------------------------------------------------------
+        $anon_key = getenv('SUPABASE_ANON_KEY'); // Fallback fetch if missing above
+        if ($anon_key) {
+            $resend_payload = json_encode(['type' => 'signup', 'email' => $email]);
+            $ch_otp = curl_init($supabase_url . '/auth/v1/resend');
+            curl_setopt($ch_otp, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch_otp, CURLOPT_POST, true);
+            curl_setopt($ch_otp, CURLOPT_POSTFIELDS, $resend_payload);
+            curl_setopt($ch_otp, CURLOPT_HTTPHEADER, [
+                'apikey: ' . $anon_key,
+                'Content-Type: application/json'
+            ]);
+            curl_exec($ch_otp);
+            curl_close($ch_otp);
+        }
     }
 
     // 3. Insert into the TENANT'S Local Customer Table using the Genuine UUID
