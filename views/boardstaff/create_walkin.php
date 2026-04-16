@@ -45,6 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['first_name'])) {
     $phone = trim($_POST['contact_no']);
     $address = trim($_POST['address'] ?? '');
     
+    $id_type = trim($_POST['id_type'] ?? 'Walk-In ID');
+    $id_number = trim($_POST['id_number'] ?? 'N/A');
+
     $password_raw = $_POST['password'] ?? '';
     $hashed_password = password_hash($password_raw, PASSWORD_DEFAULT);
     
@@ -62,8 +65,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['first_name'])) {
         $generated_email = $clean_name . rand(100, 999) . '@walkin.local';
 
         // Insert into the tenant's isolated customers table
-        $stmt = $pdo->prepare("INSERT INTO customers (first_name, middle_name, last_name, email, contact_no, address, status, is_walk_in, id_photo_front_url, id_photo_back_url, password) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, ?)");
-        $stmt->execute([$first, $middle, $last, $generated_email, $phone, $address, $status, $front_url, $back_url, $hashed_password]);
+        $stmt = $pdo->prepare("INSERT INTO customers (first_name, middle_name, last_name, email, contact_no, address, status, is_walk_in, id_photo_front_url, id_photo_back_url, password, id_type, id_number) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?, ?)");
+        $stmt->execute([$first, $middle, $last, $generated_email, $phone, $address, $status, $front_url, $back_url, $hashed_password, $id_type, $id_number]);
 
         $_SESSION['flash_success'] = "Walk-in identity successfully generated.";
         header("Location: customers.php?msg=Walk-In Identity Generated");
@@ -191,6 +194,27 @@ require_once 'includes/sidebar.php';
                         <div class="flex items-center gap-4">
                             <h2 class="text-[11px] font-headline font-black text-on-surface uppercase tracking-[0.4em]">Identity Verification & OCR Scan</h2>
                             <div class="h-[1px] flex-1 bg-outline-variant/10"></div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            <div class="space-y-3">
+                                <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">ID Type</label>
+                                <select name="id_type" required class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
+                                    <option value="" disabled selected>-- SELECT ID TYPE --</option>
+                                    <option value="National ID">National ID / PhilSys</option>
+                                    <option value="Driver's License">Driver's License</option>
+                                    <option value="Passport">Passport</option>
+                                    <option value="UMID">UMID</option>
+                                    <option value="Voter's ID">Voter's ID</option>
+                                    <option value="Other">Other Valid ID</option>
+                                </select>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">ID Number</label>
+                                <input type="text" name="id_number" required placeholder="XXX-XXXX-XXXX" 
+                                       class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner text-primary">
+                            </div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10">

@@ -29,57 +29,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ==============================================================================
         // STEP 1: RESOLVE CUSTOMER IDENTITY
         // ==============================================================================
-        $customer_id = null;
+        $customer_id = $_POST['customer_id'] ?? null;
         
-        if ($_POST['customer_type'] === 'new') {
-            // It's a Walk-In! Auto-generate the required fields for the database
-            $first_name = trim($_POST['new_first_name']);
-            $last_name  = trim($_POST['new_last_name']);
-            $contact_no = trim($_POST['new_phone']);
-            
-            // Auto-Generate Dummy App Credentials
-            $clean_name = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $first_name . $last_name));
-            $generated_email = $clean_name . rand(100, 999) . '@walkin.local';
-            $hashed_password = password_hash('Pawnereno2026', PASSWORD_DEFAULT); // Default temporary password
+        if (empty($customer_id)) {
+            throw new Exception("Please select an existing customer.");
+        }
 
-            // Insert into Database with ID Credentials (Standardized Fields)
-            $id_type = $_POST['new_id_type'] ?? 'Walk-In ID';
-            // Note: In production, handle the file upload move here. For now, we simulate the path.
-            $id_photo_path = !empty($_FILES['customer_id_image']['name']) ? 'vault/ids/' . basename($_FILES['customer_id_image']['name']) : null;
+        // --- KYC GATEKEEPER: Ensure identifying node is verified ---
+        $stmt_status = $pdo->prepare("SELECT status FROM customers WHERE customer_id = ?");
+        $stmt_status->execute([$customer_id]);
+        $cust_status = $stmt_status->fetchColumn();
 
-            $stmt = $pdo->prepare("
-                INSERT INTO customers 
-                (first_name, last_name, email, contact_no, password, is_walk_in, status, id_type, id_photo_front_url) 
-                VALUES (?, ?, ?, ?, ?, TRUE, 'verified', ?, ?) 
-                RETURNING customer_id
-            ");
-            $stmt->execute([$first_name, $last_name, $generated_email, $contact_no, $hashed_password, $id_type, $id_photo_path]);
-            $customer_id = $stmt->fetchColumn();
-            
-            // AUDIT LOG: New Walk-In Customer
-            record_audit_log($pdo, $tenant_schema, $current_user_id, 'INSERT', 'customers', $customer_id, null, [
-                'first_name' => $first_name, 
-                'last_name'  => $last_name, 
-                'email'      => $generated_email,
-                'is_walk_in' => true
-            ]);
-            
-        } else {
-            // It's an existing customer, just grab the ID from the dropdown
-            $customer_id = $_POST['customer_id'];
-            if (empty($customer_id)) {
-                throw new Exception("Please select an existing customer.");
-            }
-
-            // --- KYC GATEKEEPER: Ensure identifying node is verified ---
-            $stmt_status = $pdo->prepare("SELECT status FROM customers WHERE customer_id = ?");
-            $stmt_status->execute([$customer_id]);
-            $cust_status = $stmt_status->fetchColumn();
-
-            // Make the check case-insensitive and ignore trailing spaces
-            if (strtolower(trim($cust_status)) !== 'verified') {
-                throw new Exception("Action Denied: Customer identity is unverified. Please approve their KYC documents in the Customer Hub first.");
-            }
+        // Make the check case-insensitive and ignore trailing spaces
+        if (strtolower(trim($cust_status)) !== 'verified') {
+            throw new Exception("Action Denied: Customer identity is unverified. Please approve their KYC documents in the Customer Hub first.");
         }
 
         // ==============================================================================
