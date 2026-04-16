@@ -39,6 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['first_name'])) {
     $phone = trim($_POST['contact_no']);
     $address = trim($_POST['address'] ?? '');
     
+    $password_raw = $_POST['password'] ?? '';
+    $hashed_password = password_hash($password_raw, PASSWORD_DEFAULT);
+    
     $front_url = $_POST['front_url'] ?? null;
     $back_url = $_POST['back_url'] ?? null;
     
@@ -53,8 +56,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['first_name'])) {
         $generated_email = $clean_name . rand(100, 999) . '@walkin.local';
 
         // Insert into the tenant's isolated customers table
-        $stmt = $pdo->prepare("INSERT INTO customers (first_name, middle_name, last_name, email, contact_no, address, status, is_walk_in, id_photo_front_url, id_photo_back_url) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?)");
-        $stmt->execute([$first, $middle, $last, $generated_email, $phone, $address, $status, $front_url, $back_url]);
+        $stmt = $pdo->prepare("INSERT INTO customers (first_name, middle_name, last_name, email, contact_no, address, status, is_walk_in, id_photo_front_url, id_photo_back_url, password) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, ?)");
+        $stmt->execute([$first, $middle, $last, $generated_email, $phone, $address, $status, $front_url, $back_url, $hashed_password]);
 
         $_SESSION['flash_success'] = "Walk-in identity successfully generated.";
         header("Location: customers.php?msg=Walk-In Identity Generated");
@@ -114,7 +117,7 @@ require_once 'includes/sidebar.php';
                             <div class="h-[1px] flex-1 bg-outline-variant/10"></div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                             <!-- First Name -->
                             <div class="space-y-3">
                                 <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">Given Name</label>
@@ -134,6 +137,18 @@ require_once 'includes/sidebar.php';
                                 <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">Mobile Link</label>
                                 <input type="text" name="contact_no" required placeholder="09XXXXXXXXX" 
                                        class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
+                            </div>
+
+                            <!-- App Password -->
+                            <div class="space-y-3">
+                                <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">App Password</label>
+                                <div class="relative group">
+                                    <input type="password" name="password" id="app_password" required placeholder="SET_APP_PASSWORD" 
+                                           class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner text-primary pr-12">
+                                    <button type="button" onclick="togglePasswordVisibility()" class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-primary transition-colors">
+                                        <span id="password_eye_icon" class="material-symbols-outlined text-[18px]">visibility</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -358,6 +373,18 @@ async function checkSession(sessionId) {
             document.getElementById('back_id_placeholder').classList.remove('border-dashed', 'border-outline-variant/20');
         }
     } catch(e) { console.error('Polling error:', e); }
+}
+
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('app_password');
+    const eyeIcon = document.getElementById('password_eye_icon');
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        eyeIcon.innerText = 'visibility_off';
+    } else {
+        passwordInput.type = 'password';
+        eyeIcon.innerText = 'visibility';
+    }
 }
 
 function closeQR() {
