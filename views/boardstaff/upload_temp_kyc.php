@@ -47,7 +47,11 @@ $front_url = null;
 $back_url = null;
 
 // 3. Upload Front ID
-if (isset($_FILES['id_front']) && $_FILES['id_front']['error'] === UPLOAD_ERR_OK) {
+if (isset($_FILES['id_front'])) {
+    if ($_FILES['id_front']['error'] !== UPLOAD_ERR_OK) {
+        echo json_encode(['success' => false, 'message' => 'PHP Upload Error Code (Front): ' . $_FILES['id_front']['error']]);
+        exit;
+    }
     $tmpFront = $_FILES['id_front']['tmp_name'];
     $mimeFront = mime_content_type($tmpFront) ?: $_FILES['id_front']['type'];
     $extFront = pathinfo($_FILES['id_front']['name'], PATHINFO_EXTENSION) ?: 'jpg';
@@ -61,12 +65,16 @@ if (isset($_FILES['id_front']) && $_FILES['id_front']['error'] === UPLOAD_ERR_OK
         exit;
     }
 } else {
-    echo json_encode(['success' => false, 'message' => 'Front ID document missing.']);
+    echo json_encode(['success' => false, 'message' => 'Front ID document missing completely from payload.']);
     exit;
 }
 
 // 4. Upload Back ID
-if (isset($_FILES['id_back']) && $_FILES['id_back']['error'] === UPLOAD_ERR_OK) {
+if (isset($_FILES['id_back'])) {
+    if ($_FILES['id_back']['error'] !== UPLOAD_ERR_OK) {
+        echo json_encode(['success' => false, 'message' => 'PHP Upload Error Code (Back): ' . $_FILES['id_back']['error']]);
+        exit;
+    }
     $tmpBack = $_FILES['id_back']['tmp_name'];
     $mimeBack = mime_content_type($tmpBack) ?: $_FILES['id_back']['type'];
     $extBack = pathinfo($_FILES['id_back']['name'], PATHINFO_EXTENSION) ?: 'jpg';
@@ -80,7 +88,7 @@ if (isset($_FILES['id_back']) && $_FILES['id_back']['error'] === UPLOAD_ERR_OK) 
         exit;
     }
 } else {
-    echo json_encode(['success' => false, 'message' => 'Back ID document missing.']);
+    echo json_encode(['success' => false, 'message' => 'Back ID document missing completely from payload.']);
     exit;
 }
 

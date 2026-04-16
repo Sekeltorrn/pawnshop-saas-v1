@@ -133,9 +133,43 @@ if (!$session_id || !$schema) {
         let fileFront = null;
         let fileBack = null;
 
-        function handleFile(input, type) {
+        // --- NEW: Client-Side Image Compression ---
+        async function compressImage(file, maxWidth = 1200) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            resolve(new File([blob], file.name || 'image.jpg', { type: 'image/jpeg' }));
+                        }, 'image/jpeg', 0.8); // 80% quality JPEG
+                    };
+                };
+            });
+        }
+
+        async function handleFile(input, type) {
             if (input.files && input.files[0]) {
-                const file = input.files[0];
+                const originalFile = input.files[0];
+                
+                // Compress the massive mobile photo instantly
+                const file = await compressImage(originalFile);
                 const objectUrl = URL.createObjectURL(file);
                 
                 if (type === 'front') {
