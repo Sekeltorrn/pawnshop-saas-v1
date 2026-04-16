@@ -82,7 +82,7 @@ require_once 'includes/sidebar.php';
         <div class="relative w-full md:w-80 group">
             <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px] group-focus-within:text-primary transition-colors">search</span>
             <input type="text" placeholder="SEARCH VERIFIED DB..." onclick="showMockCustomerDetails()" 
-                   class="w-full bg-surface-container-highest border border-outline-variant/20 py-4 pl-12 pr-6 text-[11px] font-headline font-black text-on-surface outline-none focus:border-primary uppercase tracking-[0.2em] rounded-sm transition-all shadow-lg shadow-black/5">
+                   class="w-full bg-surface-container-highest border border-outline-variant/20 py-4 pl-12 pr-6 text-[11px] font-headline font-black text-on-surface outline-none focus:border-primary tracking-[0.2em] rounded-sm transition-all shadow-lg shadow-black/5">
         </div>
     </div>
 
@@ -122,21 +122,21 @@ require_once 'includes/sidebar.php';
                             <div class="space-y-3">
                                 <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">Given Name</label>
                                 <input type="text" name="first_name" required placeholder="FIRST_NAME" 
-                                       class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
+                                       class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
                             </div>
                             
                             <!-- Last Name -->
                             <div class="space-y-3">
                                 <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">Surname</label>
                                 <input type="text" name="last_name" required placeholder="LAST_NAME" 
-                                       class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
+                                       class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
                             </div>
 
                             <!-- Contact No -->
                             <div class="space-y-3">
                                 <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">Mobile Link</label>
                                 <input type="text" name="contact_no" required placeholder="09XXXXXXXXX" 
-                                       class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
+                                       class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner">
                             </div>
 
                             <!-- App Password -->
@@ -144,7 +144,7 @@ require_once 'includes/sidebar.php';
                                 <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">App Password</label>
                                 <div class="relative group">
                                     <input type="password" name="password" id="app_password" required placeholder="SET_APP_PASSWORD" 
-                                           class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner text-primary pr-12">
+                                           class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner text-primary pr-12">
                                     <button type="button" onclick="togglePasswordVisibility()" class="absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-primary transition-colors">
                                         <span id="password_eye_icon" class="material-symbols-outlined text-[18px]">visibility</span>
                                     </button>
@@ -167,7 +167,7 @@ require_once 'includes/sidebar.php';
                                 <div class="max-w-md space-y-3">
                                     <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">Middle Name</label>
                                     <input type="text" name="middle_name" placeholder="PATRONYMIC / INITIAL" 
-                                           class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all shadow-inner">
+                                           class="w-full bg-surface-container-highest border border-outline-variant/10 p-5 text-[13px] font-headline font-black outline-none focus:border-primary tracking-widest rounded-sm transition-all shadow-inner">
                                 </div>
                             </div>
                         </div>
@@ -176,7 +176,7 @@ require_once 'includes/sidebar.php';
                         <div class="space-y-3">
                             <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] ml-1 opacity-50">Residential Physical Address</label>
                             <textarea name="address" rows="3" placeholder="FULL_STREET_ADDRESS / BARANGAY / MUNICIPALITY" 
-                                      class="w-full bg-surface-container-highest border border-outline-variant/10 p-6 text-[13px] font-headline font-black outline-none focus:border-primary uppercase tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner resize-none"></textarea>
+                                      class="w-full bg-surface-container-highest border border-outline-variant/10 p-6 text-[13px] font-headline font-black outline-none focus:border-primary tracking-widest rounded-sm transition-all focus:bg-surface-container-high shadow-inner resize-none"></textarea>
                         </div>
                     </div>
 
