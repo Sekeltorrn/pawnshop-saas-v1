@@ -255,6 +255,12 @@ create table tenant_settings (
   store_open_time time without time zone null default '08:00:00'::time without time zone,
   store_close_time time without time zone null default '17:00:00'::time without time zone,
   closed_days jsonb null default '["Sunday"]'::jsonb,
+  portal_title character varying(100) null,
+  portal_tagline text null,
+  portal_bg_color character varying(7) null default '#0a0b0d'::character varying,
+  portal_btn_color character varying(7) null default '#ff6b00'::character varying,
+  portal_logo_url text null,
+  portal_custom_blocks jsonb null default '[{"icon": "location_on", "title": "Location", "content": "1245 Opulence Avenue\nSuite 200\nMetropolis, NY 10022"}, {"icon": "call", "title": "Contact", "content": "+1 (555) 867-5309\nconcierge@merlinpawnshop.com"}, {"icon": "schedule", "title": "Hours", "content": "Mon - Fri: 10:00 AM - 6:00 PM\nSat: 11:00 AM - 4:00 PM\nSun: By Appointment Only"}]'::jsonb,
   constraint tenant_settings_pkey primary key (setting_id)
 );
 
@@ -296,14 +302,12 @@ create table appointments (
   appointment_date date not null,
   appointment_time time without time zone not null,
   purpose character varying(50) not null,
-  item_description text null,
-  item_image_url text null,
+  remarks text null,
   status character varying(20) not null default 'pending'::character varying,
-  admin_notes text null,
   created_at timestamp with time zone null default timezone ('utc'::text, now()),
   updated_at timestamp with time zone null default timezone ('utc'::text, now()),
   constraint appointments_pkey primary key (appointment_id),
-  constraint appointments_customer_id_fkey foreign KEY (customer_id) references customers (customer_id) on delete cascade
+  constraint appointments_customer_id_fkey foreign KEY (customer_id) references tenant_pwn_18e601.customers (customer_id) on delete CASCADE
 );
 
 create trigger update_tenant_appointments_modtime BEFORE

@@ -24,98 +24,183 @@ if (!$shopIdentifier) {
 }
 
 try {
-    // 4. Query the database using the $pdo variable from db_connect.php
-    // Note: We use business_name as shop_name because of your table structure
-    $stmt = $pdo->prepare("SELECT business_name as shop_name, shop_code FROM public.profiles WHERE shop_slug = ? OR shop_code = ?");
+    // 1. Get the Tenant Profile and Schema
+    $stmt = $pdo->prepare("SELECT business_name as shop_name, shop_code, schema_name FROM public.profiles WHERE shop_slug = ? OR shop_code = ?");
     $stmt->execute([$shopIdentifier, $shopIdentifier]);
     $shop = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$shop) {
         die("<div style='background:#020617; color:white; height:100vh; display:flex; justify-content:center; align-items:center; font-family:sans-serif;'><h1>404: Shop Not Found</h1></div>");
     }
+    
+    $schema = $shop['schema_name'];
+
+    // 2. Fetch the Tenant's Custom Portal Settings
+    $settingsStmt = $pdo->query("SELECT * FROM {$schema}.tenant_settings LIMIT 1");
+    $settings = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    // 3. Assign Variables with Fallbacks
+    $bgColor = $settings['portal_bg_color'] ?? '#f8f9fa';
+    $btnColor = $settings['portal_btn_color'] ?? '#00162a'; 
+    $title = $settings['portal_title'] ?? $shop['shop_name'];
+    $tagline = $settings['portal_tagline'] ?? 'Curating value and preserving legacy. A modern approach to premium asset lending and acquisitions.';
+    $logoUrl = $settings['portal_logo_url'] ?? null;
+    $customBlocksJson = $settings['portal_custom_blocks'] ?? '[]';
+    $customBlocks = json_decode($customBlocksJson, true);
+    if (!is_array($customBlocks)) $customBlocks = [];
+
+    // Luminance logic for dynamic Tailwind text contrast
+    $hex = ltrim($bgColor, '#');
+    $r = hexdec(substr($hex, 0, 2));
+    $g = hexdec(substr($hex, 2, 2));
+    $b = hexdec(substr($hex, 4, 2));
+    $luminance = (0.299 * $r + 0.587 * $g + 0.114 * $b) / 255;
+    $isLight = $luminance > 0.5;
+    $onSurface = $isLight ? '#191c1d' : '#ffffff';
+    $onSurfaceVariant = $isLight ? '#43474d' : '#a0a3a8';
+    $cardBg = $isLight ? '#ffffff' : 'rgba(255, 255, 255, 0.05)';
+
 } catch (PDOException $e) {
-    // This will now tell us EXACTLY what is wrong (credentials, driver, etc)
     die("Database Connection Error: " . $e->getMessage());
 }
 ?>
-
 <!DOCTYPE html>
-<html lang="en">
+<html class="light" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title><?= htmlspecialchars($shop['shop_name']) ?> - Mobile Portal</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title><?= htmlspecialchars($title) ?> | RenoGO</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "<?= htmlspecialchars($btnColor) ?>",
+                        "secondary": "<?= htmlspecialchars($btnColor) ?>",
+                        "surface": "<?= htmlspecialchars($bgColor) ?>",
+                        "surface-card": "<?= $cardBg ?>",
+                        "background": "<?= htmlspecialchars($bgColor) ?>",
+                        "surface-container-lowest": "<?= htmlspecialchars($bgColor) ?>",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "on-surface": "<?= $onSurface ?>",
+                        "on-surface-variant": "<?= $onSurfaceVariant ?>",
+                        "primary-container": "<?= htmlspecialchars($btnColor) ?>40",
+                        "secondary-fixed": "<?= htmlspecialchars($btnColor) ?>",
+                        "inverse-primary": "#aec9ea",
+                        "primary-fixed-dim": "#aec9ea",
+                        "outline-variant": "#c3c6ce",
+                        "surface-container-high": "#e7e8e9"
+                    },
+                    fontFamily: {
+                        headline: ["Manrope"],
+                        body: ["Inter"],
+                        label: ["Inter"]
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
-        .glow-mesh {
-            background: radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.15) 0%, transparent 50%),
-                        radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.1) 0%, transparent 40%);
+        .glass-panel {
+            background: rgba(248, 249, 250, 0.85);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+        }
+        .hero-gradient {
+            background: linear-gradient(135deg, #00162a 0%, <?= htmlspecialchars($btnColor) ?> 100%);
+        }
+        .ambient-shadow {
+            box-shadow: 0 8px 24px rgba(25, 28, 29, 0.06);
+        }
+        body {
+            min-height: max(884px, 100dvh);
         }
     </style>
 </head>
-<body class="bg-[#0B0F19] text-white min-h-[100dvh] flex flex-col justify-center relative overflow-hidden selection:bg-blue-500/30 glow-mesh">
+<body class="bg-surface font-body text-on-surface antialiased min-h-screen flex flex-col">
     
-    <!-- Background Accents -->
-    <div class="absolute top-[-10%] left-[-10%] w-72 h-72 bg-blue-600/10 rounded-full blur-[100px]"></div>
-    <div class="absolute bottom-[-10%] right-[-10%] w-72 h-72 bg-emerald-600/5 rounded-full blur-[100px]"></div>
-
-    <div class="relative z-10 px-6 py-10 w-full max-w-md mx-auto flex flex-col h-full items-center">
-        
-        <!-- Hero Branding -->
-        <div class="text-center mt-4 mb-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div class="inline-flex items-center justify-center w-16 h-16 rounded-[2rem] bg-gradient-to-tr from-blue-600 to-emerald-400 mb-8 shadow-2xl shadow-blue-500/30 ring-4 ring-white/5">
-                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                </svg>
-            </div>
-            <p class="text-[10px] font-black tracking-[0.4em] text-blue-500 uppercase mb-2">Authenticated RenoGO Node</p>
-            <h1 class="text-4xl font-[900] tracking-tighter mb-3 italic">
-                <?= htmlspecialchars($shop['shop_name']) ?>
-            </h1>
-            <p class="text-slate-400 text-sm font-medium px-4 tracking-wide">
-                Your pawnshop, securely in your pocket with <span class="text-white font-bold italic">RenoGO</span>.
-            </p>
+    <header class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl flex items-center justify-between px-6 py-4 shadow-sm dark:shadow-none">
+        <div class="font-headline tracking-tight font-bold text-xl font-extrabold tracking-tighter text-primary dark:text-slate-100">
+            RenoGO
         </div>
+    </header>
 
-        <!-- The Shop Code Centerpiece -->
-        <div class="w-full bg-white/[0.03] backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-10 text-center mb-12 shadow-2xl relative group overflow-hidden animate-in fade-in zoom-in duration-1000 delay-150">
-            <div class="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent"></div>
-            
-            <p class="text-[11px] font-black text-slate-500 uppercase tracking-[0.3em] mb-6">Device Pairing Code</p>
-            
-            <div class="relative inline-block">
-                <div class="absolute -inset-4 bg-blue-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <div class="text-5xl md:text-6xl font-mono font-bold tracking-[0.2em] text-transparent bg-clip-text bg-gradient-to-br from-white via-blue-200 to-white drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] relative">
-                    <?= htmlspecialchars($shop['shop_code']) ?>
+    <main class="flex-grow pt-[88px]">
+        <section class="bg-surface-container-lowest px-6 py-12">
+            <div class="max-w-md mx-auto space-y-8">
+                <div class="text-center space-y-4 flex flex-col items-center">
+                    <?php if($logoUrl): ?>
+                        <img alt="Shop Logo" class="w-24 h-24 object-cover rounded-2xl shadow-xl border-4 border-surface" src="<?= htmlspecialchars($logoUrl) ?>"/>
+                    <?php endif; ?>
+                    
+                    <h1 class="font-headline text-4xl font-bold tracking-tight text-primary mt-2">
+                        <?= htmlspecialchars($title) ?>
+                    </h1>
+                    <p class="font-body text-on-surface-variant text-base leading-relaxed">
+                        <?= nl2br(htmlspecialchars($tagline)) ?>
+                    </p>
+                </div>
+                
+                <div class="space-y-6">
+                    <?php foreach($customBlocks as $block): ?>
+                    <div class="bg-surface-card ring-1 ring-black/5 dark:ring-white/10 p-6 rounded-xl ambient-shadow flex items-start gap-4">
+                        <span class="material-symbols-outlined text-secondary mt-1" style="font-variation-settings: 'FILL' 1;"><?= htmlspecialchars($block['icon'] ?? 'info') ?></span>
+                        <div>
+                            <h3 class="font-headline text-lg font-bold text-primary mb-1"><?= htmlspecialchars($block['title'] ?? '') ?></h3>
+                            <p class="font-body text-on-surface-variant text-sm"><?= nl2br(htmlspecialchars($block['content'] ?? '')) ?></p>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
-            
-            <div class="mt-8 flex items-center justify-center gap-2 text-slate-500">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                <p class="text-[10px] font-bold uppercase tracking-widest">Enter this code in-app</p>
+        </section>
+
+        <section class="hero-gradient px-6 py-16 text-on-primary">
+            <div class="max-w-md mx-auto space-y-10 relative z-10">
+                <div class="space-y-6 text-center">
+                    <h2 class="font-headline text-4xl font-bold tracking-tight leading-tight">Your Pawnshop, Anywhere.</h2>
+                    <p class="font-body text-on-primary-container text-lg leading-relaxed">Experience the authority of a private bank with the convenience of a modern app.</p>
+                </div>
+                
+                <div class="bg-white/10 backdrop-blur-md rounded-xl p-8 text-center border border-white/20">
+                    <p class="font-label text-sm text-inverse-primary uppercase tracking-widest mb-4">Shop Code</p>
+                    <div class="font-headline text-5xl font-extrabold text-secondary-fixed tracking-tight">
+                        <?= htmlspecialchars($shop['shop_code']) ?>
+                    </div>
+                    <p class="font-body text-sm text-primary-fixed-dim mt-4">Enter this code in the RenoGO app to connect instantly with <?= htmlspecialchars($title) ?>.</p>
+                </div>
+                
+                <div class="flex flex-col gap-4">
+                    <a href="/downloads/RenoGo.apk" download="RenoGo.apk" class="w-full bg-secondary text-on-secondary font-headline font-bold text-lg py-4 px-8 rounded-xl hover:opacity-90 transition-opacity ambient-shadow flex items-center justify-center gap-2">
+                        Download App
+                        <span class="material-symbols-outlined">download</span>
+                    </a>
+                    <button class="w-full bg-transparent border border-outline-variant/30 text-on-primary font-headline font-bold text-base py-3 px-6 rounded-xl hover:bg-white/5 transition-colors">
+                        Learn More
+                    </button>
+                </div>
             </div>
-        </div>
+        </section>
+    </main>
 
-        <!-- Action Callbacks -->
-        <div class="w-full mt-auto space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-            <a href="/downloads/RenoGo.apk" download="RenoGo.apk" class="flex items-center justify-center w-full py-5 rounded-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-black text-xs uppercase tracking-[0.2em] transition-all shadow-[0_15px_30px_-5px_rgba(37,99,235,0.4)] active:scale-[0.98] group">
-                <svg class="w-5 h-5 mr-3 group-hover:animate-bounce" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M17.523 15.3414c-.5511 0-1.0264-.1964-1.4259-.5893-.3995-.3929-.5993-.8682-.5993-1.4259 0-.5577.1998-1.033.5993-1.4259.3995-.3929.8748-.5893 1.4259-.5893.5512 0 1.0264.1964 1.4259.5893.3995.3929.5993.8682.5993 1.4259 0 .5577-.1998 1.033-.5993 1.4259-.3995.3929-.8747.5893-1.4259.5893m-11.046 0c-.5511 0-1.0264-.1964-1.4259-.5893-.3995-.3929-.5993-.8682-.5993-1.4259 0-.5577.1998-1.033.5993-1.4259.3995-.3929.8748-.5893 1.4259-.5893.5512 0 1.0264.1964 1.4259.5893.3995.3929.5993.8682.5993 1.4259 0 .5577-.1998 1.033-.5993 1.4259-.3995.3929-.8747.5893-1.4259.5893m11.4398-4.1378-1.954-3.3828c-.1391-.2421-.057-.549.185-.688.2422-.139.549-.057.688.185l1.9715 3.4131c1.5544-.7073 3.2599-1.0963 5.0487-1.1278v-.0023l-.0011-.0045V9.5937h.0011c4.5444 0 8.636 1.958 11.536 5.089l1.9823-3.4316c.139-.242.4459-.3241.688-.185.2421.139.3242.4459.185.688l-1.9647 3.4013c2.723 2.8055 4.4172 6.6402 4.4172 10.8505H.0011c0-4.2103 1.6942-8.045 4.4173-10.8505M12 .001h.0011L12 .001z"/>
-                </svg>
-                Download RenoGO for Android
-            </a>
-            
-            <button class="flex items-center justify-center w-full py-5 rounded-full bg-transparent border border-white/10 text-white/40 font-bold text-[10px] uppercase tracking-[0.2em] cursor-not-allowed">
-                iOS Version Coming Soon
-            </button>
+    <footer class="w-full py-12 px-8 bg-slate-50 dark:bg-slate-900 flex flex-col md:flex-row items-center justify-between gap-4 max-w-7xl mx-auto mt-auto">
+        <div class="font-headline font-bold text-primary dark:text-slate-100 text-lg">
+            RenoGO
         </div>
-
-        <p class="mt-12 text-[9px] text-slate-700 font-black uppercase tracking-[0.4em]">
-            Secured by <span class="text-slate-600">PawneReno Engine</span>
-        </p>
-    </div>
+        <div class="flex flex-wrap items-center justify-center gap-6 font-body text-sm text-slate-500">
+            <a class="hover:text-secondary transition-colors opacity-80 hover:opacity-100" href="#">Terms of Service</a>
+            <a class="hover:text-secondary transition-colors opacity-80 hover:opacity-100" href="#">Privacy Policy</a>
+            <a class="hover:text-secondary transition-colors opacity-80 hover:opacity-100" href="#">Contact Support</a>
+        </div>
+        <div class="font-body text-sm text-slate-500">
+            © 2026 RenoGO Financial. All rights reserved.
+        </div>
+    </footer>
 </body>
 </html>

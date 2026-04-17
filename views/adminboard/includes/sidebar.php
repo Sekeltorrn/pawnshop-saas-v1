@@ -75,6 +75,11 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
             Config
         </a>
 
+        <a class="<?= $base_class ?> <?= ($current_page == 'portal_settings.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/portal_settings.php">
+            <span class="material-symbols-outlined text-lg <?= ($current_page == 'portal_settings.php') ? $active_icon : $inactive_icon ?>">web</span>
+            Portal Settings
+        </a>
+
         <div class="h-4"></div>
 
         <button onclick="openLogoutModal()" class="<?= $base_class ?> <?= $inactive_class ?> mt-4 hover:bg-red-500/10 hover:text-red-500 w-full text-left transition-all">

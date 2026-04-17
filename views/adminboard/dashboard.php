@@ -25,21 +25,25 @@ try {
     // Enforce Tenant Isolation
     $pdo->exec("SET search_path TO \"{$tenant_schema}\", public;");
 
-    // A. Total Capital Deployed
-    $stmt = $pdo->query("SELECT COALESCE(SUM(principal_amount), 0) as total_capital_out, COUNT(loan_id) as total_active_loans FROM loans WHERE status = 'active'");
+    // 1. Capital at Risk (Total Exposure)
+    $stmt = $pdo->query("SELECT COALESCE(SUM(principal_amount), 0) as total_exposure FROM loans WHERE status = 'active'");
     $capital = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // B. Registered Mobile Users (Customers with linked Auth IDs)
-    $stmt = $pdo->query("SELECT COUNT(customer_id) as total_users, SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 ELSE 0 END) as new_this_week FROM customers WHERE auth_user_id IS NOT NULL");
-    $users = $stmt->fetch(PDO::FETCH_ASSOC);
+    // 2. Liquidation / Remate Pipeline (Dead Money)
+    $stmt = $pdo->query("SELECT COALESCE(SUM(i.appraised_value), 0) as dead_money FROM loans l JOIN inventory i ON l.item_id = i.item_id WHERE l.expiry_date < CURRENT_DATE AND l.status IN ('active', 'expired') AND i.item_status IN ('in_vault', 'expired')");
+    $remate = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // C. Actual Cash Realized (MTD - Month to Date Revenue)
+    // 3. Renewals, Interest, & Fee Revenue (Month-to-Date)
     $stmt = $pdo->query("SELECT COALESCE(SUM(interest_paid + penalty_paid + service_fee_paid), 0) as mtd_revenue FROM payments WHERE status = 'completed' AND date_trunc('month', payment_date) = date_trunc('month', CURRENT_DATE)");
     $revenue = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // D. Liquidation / Remate Value (Expired Status)
-    $stmt = $pdo->query("SELECT COALESCE(SUM(principal_amount), 0) as total_remate_value, COUNT(loan_id) as total_expired_assets FROM loans WHERE status = 'expired'");
-    $remate = $stmt->fetch(PDO::FETCH_ASSOC);
+    // 4. Customer Base (App vs Walk-in)
+    $stmt = $pdo->query("SELECT 
+        COUNT(customer_id) as total_customers, 
+        COALESCE(SUM(CASE WHEN is_walk_in = false THEN 1 ELSE 0 END), 0) as mobile_users,
+        COALESCE(SUM(CASE WHEN is_walk_in = true THEN 1 ELSE 0 END), 0) as walkin_users 
+        FROM customers");
+    $customer_stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // E. Liquidation Pipeline (Top 5 Expired)
     $stmt = $pdo->query("
@@ -47,7 +51,10 @@ try {
                (CURRENT_DATE - l.expiry_date) as days_expired
         FROM loans l
         JOIN customers c ON l.customer_id = c.customer_id
-        WHERE l.status = 'expired'
+        JOIN inventory i ON l.item_id = i.item_id
+        WHERE l.expiry_date < CURRENT_DATE 
+          AND l.status IN ('active', 'expired') 
+          AND i.item_status IN ('in_vault', 'expired')
         ORDER BY l.expiry_date ASC LIMIT 5
     ");
     $pipeline = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -55,7 +62,7 @@ try {
     // F. Live Cashflow Ledger (UNION of Payments IN and Loans OUT)
     $stmt = $pdo->query("
         SELECT * FROM (
-            SELECT amount, payment_date as event_date, payment_type as event_type, l.pawn_ticket_no, c.last_name, c.first_name, 'in' as direction
+            SELECT amount, payment_date::timestamp as event_date, payment_type as event_type, l.pawn_ticket_no, c.last_name, c.first_name, 'in' as direction
             FROM payments p
             JOIN loans l ON p.loan_id = l.loan_id
             JOIN customers c ON l.customer_id = c.customer_id
@@ -96,57 +103,54 @@ include 'includes/header.php';
 
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         
-        <!-- Total Capital Deployed -->
         <div class="bg-[#141518] border border-white/5 p-6 relative overflow-hidden group">
             <div class="absolute top-0 right-0 w-32 h-32 bg-[#ff6b00]/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[#ff6b00] text-sm">account_balance</span> Total Capital Deployed
+                <span class="material-symbols-outlined text-[#ff6b00] text-sm">account_balance</span> Capital at Risk
             </p>
-            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">₱ <?= number_format($capital['total_capital_out'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">₱ <?= number_format($capital['total_exposure'], 2) ?></h3>
             <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-                <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Active Contracts</span>
-                <span class="text-[10px] text-[#ff6b00] font-mono font-bold"><?= $capital['total_active_loans'] ?> Active</span>
+                <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Total Exposure</span>
+                <span class="text-[10px] text-[#ff6b00] font-mono font-bold">Active Cash Out</span>
             </div>
         </div>
 
-        <!-- Registered Mobile Users -->
-        <div class="bg-[#141518] border border-white/5 p-6 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
-            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                <span class="material-symbols-outlined text-blue-500 text-sm">group</span> Registered Mobile Users
-            </p>
-            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight"><?= $users['total_users'] ?> Users</h3>
-            <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-                <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Growth Trend</span>
-                <span class="text-[10px] text-blue-400 font-mono font-bold">+<?= $users['new_this_week'] ?? 0 ?> New this week</span>
-            </div>
-        </div>
-
-        <!-- Actual Cash Realized (MTD) -->
-        <div class="bg-[#141518] border border-white/5 p-6 relative overflow-hidden group">
-            <div class="absolute top-0 right-0 w-32 h-32 bg-[#00ff41]/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
-            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                <span class="material-symbols-outlined text-[#00ff41] text-sm">payments</span> Actual Cash Realized (MTD)
-            </p>
-            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">₱ <?= number_format($revenue['mtd_revenue'], 2) ?></h3>
-            <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-                <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Operational Revenue</span>
-                <span class="text-[10px] text-[#00ff41] font-mono font-bold">Interest & Fees</span>
-            </div>
-        </div>
-
-        <!-- Liquidation / Remate Value -->
         <div class="bg-[#141518] border border-white/5 p-6 relative overflow-hidden group">
             <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
-                <span class="material-symbols-outlined text-red-500 text-sm">gavel</span> Liquidation / Remate Value
+                <span class="material-symbols-outlined text-red-500 text-sm">gavel</span> Liquidation Pipeline
             </p>
-            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">₱ <?= number_format($remate['total_remate_value'], 2) ?></h3>
+            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">₱ <?= number_format($remate['dead_money'], 2) ?></h3>
             <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
-                <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Available for Sale</span>
-                <span class="text-[10px] text-red-500 font-mono font-bold"><?= $remate['total_expired_assets'] ?> Expired Assets</span>
+                <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Dead Money</span>
+                <span class="text-[10px] text-red-500 font-mono font-bold">Expired Assets</span>
             </div>
         </div>
+
+        <div class="bg-[#141518] border border-white/5 p-6 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-[#00ff41]/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <span class="material-symbols-outlined text-[#00ff41] text-sm">payments</span> Renewals, Interest, & Fee Revenue
+            </p>
+            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight">₱ <?= number_format($revenue['mtd_revenue'], 2) ?></h3>
+            <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
+                <span class="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Month-to-Date</span>
+                <span class="text-[10px] text-[#00ff41] font-mono font-bold">Actual Cash In</span>
+            </div>
+        </div>
+
+        <div class="bg-[#141518] border border-white/5 p-6 relative overflow-hidden group">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+            <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <span class="material-symbols-outlined text-blue-500 text-sm">group</span> Customer Base
+            </p>
+            <h3 class="text-2xl font-black text-white font-mono mt-2 tracking-tight"><?= $customer_stats['total_customers'] ?> Total</h3>
+            <div class="mt-4 flex items-center justify-between border-t border-white/5 pt-3">
+                <span class="text-[10px] text-[#00ff41] font-mono font-bold"><?= $customer_stats['mobile_users'] ?> App Users</span>
+                <span class="text-[10px] text-slate-500 font-mono font-bold border-l border-white/10 pl-2"><?= $customer_stats['walkin_users'] ?> Walk-ins</span>
+            </div>
+        </div>
+
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -241,4 +245,4 @@ include 'includes/header.php';
     </div>
 </div>
 
-<?php include 'includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

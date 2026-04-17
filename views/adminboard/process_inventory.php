@@ -65,6 +65,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['toast_success'] = "Item priced and moved to retail display.";
         } 
         
+        elseif ($action === 'bulk_move_to_retail') {
+            $item_ids = $_POST['item_ids'] ?? [];
+            $prices = $_POST['prices'] ?? [];
+
+            if (!empty($item_ids)) {
+                // Prepare the update statement for the inventory table
+                $stmt = $pdo->prepare("
+                    UPDATE inventory 
+                    SET item_status = 'for_sale', 
+                        retail_price = :price, 
+                        updated_at = NOW() 
+                    WHERE item_id = :id
+                ");
+                
+                // Loop through each checked item and update its status and price
+                foreach ($item_ids as $id) {
+                    // Grab the default appraised value sent from the hidden input
+                    $price = isset($prices[$id]) ? (float)$prices[$id] : 0;
+                    
+                    $stmt->execute([
+                        ':price' => $price,
+                        ':id' => $id
+                    ]);
+                }
+                
+                $_SESSION['toast_success'] = count($item_ids) . " items successfully moved to the Retail Floor.";
+            } else {
+                $_SESSION['toast_error'] = "No items selected for bulk move.";
+            }
+        } 
+        
         elseif ($action === 'mark_sold') {
             $stmt = $pdo->prepare("UPDATE inventory SET item_status = 'sold', updated_at = NOW() WHERE item_id = ?");
             $stmt->execute([$item_id]);

@@ -58,6 +58,7 @@ $stats = [
 
 foreach ($allItems as $item) {
     $status = strtolower(trim($item['item_status'] ?? ''));
+    $loan_status = strtolower(trim($item['loan_status'] ?? ''));
     $item_loc = $item['storage_location'] ?? '';
 
     // 1. Filter Location
@@ -66,7 +67,7 @@ foreach ($allItems as $item) {
     // 2. Use the actual item worth directly from the database
     $actual_value = (float)($item['appraised_value'] ?? 0);
 
-    // 3. Tally Counts & Actual Values
+    // 3. Strict Tallying Logic
     if ($status === 'expired' || $status === 'rematado') { 
         $stats['rematado']['count']++; 
         $stats['rematado']['value'] += $actual_value; 
@@ -77,10 +78,10 @@ foreach ($allItems as $item) {
         $redeemed[] = $item; 
     } elseif ($status === 'for_sale') { 
         $stats['retail']['count']++; 
-        // Note: You can switch this to use retail_price if you prefer to see potential profit!
         $stats['retail']['value'] += (float)($item['retail_price'] ?? $actual_value); 
         $for_sale[] = $item; 
-    } else { 
+    } elseif ($status === 'in_vault' && ($loan_status === 'active' || $loan_status === 'renewed')) { 
+        // ONLY allow items that are physically in the vault AND have valid paperwork
         $stats['vault']['count']++; 
         $stats['vault']['value'] += $actual_value; 
         $in_vault[] = $item; 
@@ -168,15 +169,39 @@ foreach ($allItems as $item) {
         </form>
     </div>
 
+<?php
+// Sort rematado items by oldest expiry date first
+usort($rematado, function($a, $b) {
+    return strtotime($a['expiry_date'] ?? 'now') - strtotime($b['expiry_date'] ?? 'now');
+});
+?>
     <div id="tab-rematado" class="tab-content hidden bg-red-500/5 border border-red-500/20 rounded-sm">
+        <form id="rematado-bulk-form" action="process_inventory.php" method="POST" class="hidden">
+            <input type="hidden" name="action" value="bulk_move_to_retail">
+        </form>
+
+        <div class="flex justify-between items-center bg-black/40 p-3 border-b border-red-500/20">
+            <label class="flex items-center gap-2 text-xs text-red-400 uppercase font-bold cursor-pointer">
+                <input type="checkbox" id="selectAllRematado" class="accent-red-500"> Select All
+            </label>
+            <button type="submit" form="rematado-bulk-form" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1 text-[10px] font-black uppercase tracking-widest transition-colors rounded-sm">BULK MOVE TO RETAIL</button>
+        </div>
         <table class="w-full text-left text-[10px] uppercase font-mono text-slate-300">
             <tbody class="divide-y divide-red-500/10">
                 <?php if(empty($rematado)): ?><tr><td colspan="5" class="p-4 text-center opacity-50 italic">Pipeline is clear.</td></tr><?php endif; ?>
                 <?php foreach($rematado as $item): ?>
+                    <?php $days_expired = floor((time() - strtotime($item['expiry_date'] ?? 'now')) / 86400); ?>
                     <tr class="hover:bg-red-500/10 searchable-row">
+                        <td class="p-4 w-10">
+                            <input type="checkbox" name="item_ids[]" value="<?= $item['item_id'] ?>" form="rematado-bulk-form" class="accent-red-500 rematado-cb">
+                            <input type="hidden" name="prices[<?= $item['item_id'] ?>]" value="<?= $item['appraised_value'] ?>" form="rematado-bulk-form">
+                        </td>
                         <td class="p-4 text-red-400 font-bold">PT-<?= $item['pawn_ticket_no'] ?? 'N/A' ?></td>
-                        <td class="p-4 font-bold text-white"><?= htmlspecialchars($item['item_name']) ?> <span class="hidden"><?= htmlspecialchars($item['item_description'] ?? '') ?></span></td>
-                        <td class="p-4 opacity-50">Exp: <?= date('M d', strtotime($item['expiry_date'] ?? 'now')) ?></td>
+                        <td class="p-4 font-bold text-white">
+                            <?= htmlspecialchars($item['item_name']) ?> 
+                            <span class="text-red-500 text-[10px] ml-2">(<?= max(0, $days_expired) ?> Days Expired)</span>
+                            <span class="hidden"><?= htmlspecialchars($item['item_description'] ?? '') ?></span>
+                        </td>
                         <td class="p-4 text-right">
                             <form action="process_inventory.php" method="POST" class="flex items-center justify-end gap-3">
                                 <input type="hidden" name="action" value="move_to_retail">
@@ -325,6 +350,9 @@ if(selectAll) selectAll.addEventListener('change', e => document.querySelectorAl
 
 const selectAllRetail = document.getElementById('selectAllRetail');
 if(selectAllRetail) selectAllRetail.addEventListener('change', e => document.querySelectorAll('.retail-cb').forEach(cb => cb.checked = e.target.checked));
+
+const selectAllRematado = document.getElementById('selectAllRematado');
+if(selectAllRematado) selectAllRematado.addEventListener('change', e => document.querySelectorAll('.rematado-cb').forEach(cb => cb.checked = e.target.checked));
 
 function openSidebar(data) {
     document.getElementById('side-name').innerText = data.item_name || 'Unknown';

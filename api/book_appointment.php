@@ -21,8 +21,7 @@ $customer_id = $json_input['customer_id'] ?? '';
 $appointment_date = $json_input['appointment_date'] ?? '';
 $appointment_time = $json_input['appointment_time'] ?? '';
 $purpose = $json_input['purpose'] ?? '';
-$item_description = $json_input['item_description'] ?? null;
-$item_image_url = $json_input['item_image_url'] ?? null;
+$remarks = $json_input['item_description'] ?? null;
 
 // Validate tenant_schema via Regex (Alpha-numeric and underscores only)
 if (!preg_match('/^[a-zA-Z0-9_]+$/', $schemaName)) {
@@ -46,16 +45,15 @@ try {
 
     // Insert the new appointment record
     $stmt = $pdo->prepare("INSERT INTO appointments 
-        (customer_id, appointment_date, appointment_time, purpose, item_description, item_image_url, status) 
-        VALUES (?, ?, ?, ?, ?, ?, 'pending')");
+        (customer_id, appointment_date, appointment_time, purpose, remarks, status) 
+        VALUES (?, ?, ?, ?, ?, 'pending')");
     
     $stmt->execute([
         $customer_id,
         $appointment_date,
         $appointment_time,
         $purpose,
-        $item_description,
-        $item_image_url
+        $remarks
     ]);
 
     echo json_encode([
