@@ -122,9 +122,22 @@ if (!isset($_SESSION['user_id'])) {
                             <option value="partnership">PARTNERSHIP</option>
                         </select>
                     </div>
-                    <div class="space-y-1.5">
-                        <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Store Location (City)</label>
-                        <input name="location" required type="text" placeholder="QUEZON CITY, METRO MANILA" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                    <div class="space-y-1.5 flex flex-col gap-2">
+                        <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Store Location</label>
+                        
+                        <input type="hidden" name="location" id="full-location" required>
+                        
+                        <select id="api-region" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-2.5 px-4 outline-none appearance-none cursor-pointer transition-all">
+                            <option value="">1. SELECT REGION</option>
+                        </select>
+                        
+                        <select id="api-province" disabled class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-2.5 px-4 outline-none appearance-none cursor-not-allowed opacity-50 transition-all">
+                            <option value="">2. SELECT PROVINCE</option>
+                        </select>
+                        
+                        <select id="api-city" disabled class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-2.5 px-4 outline-none appearance-none cursor-not-allowed opacity-50 transition-all">
+                            <option value="">3. SELECT CITY/MUNICIPALITY</option>
+                        </select>
                     </div>
                 </div>
 
@@ -166,6 +179,88 @@ if (!isset($_SESSION['user_id'])) {
             formatted = formatted.replace(/-+/g, '-');
             
             this.value = formatted;
+        });
+
+        // --- PSGC PHILIPPINE ADDRESS API LOGIC ---
+        const regionSelect = document.getElementById('api-region');
+        const provinceSelect = document.getElementById('api-province');
+        const citySelect = document.getElementById('api-city');
+        const fullLocation = document.getElementById('full-location');
+
+        // 1. Fetch all Regions on page load
+        fetch('https://psgc.gitlab.io/api/regions')
+            .then(res => res.json())
+            .then(data => {
+                data.sort((a,b) => a.name.localeCompare(b.name)).forEach(region => {
+                    regionSelect.add(new Option(region.name, region.code));
+                });
+            }).catch(err => console.error("PSGC API Error:", err));
+
+        // 2. When Region changes, fetch Provinces
+        regionSelect.addEventListener('change', function() {
+            provinceSelect.innerHTML = '<option value="">2. SELECT PROVINCE</option>';
+            citySelect.innerHTML = '<option value="">3. SELECT CITY/MUNICIPALITY</option>';
+            provinceSelect.disabled = true; citySelect.disabled = true;
+            provinceSelect.classList.add('cursor-not-allowed', 'opacity-50');
+            citySelect.classList.add('cursor-not-allowed', 'opacity-50');
+            fullLocation.value = '';
+
+            if (this.value) {
+                // SPECIAL CASE: Metro Manila (NCR) has no provinces in the API
+                if(this.value === '130000000') {
+                    provinceSelect.add(new Option('METRO MANILA', 'NCR'));
+                    provinceSelect.value = 'NCR';
+                    fetchCities('https://psgc.gitlab.io/api/regions/130000000/cities-municipalities');
+                } else {
+                    fetch(`https://psgc.gitlab.io/api/regions/${this.value}/provinces`)
+                    .then(res => res.json())
+                    .then(data => {
+                        provinceSelect.disabled = false;
+                        provinceSelect.classList.remove('cursor-not-allowed', 'opacity-50');
+                        data.sort((a,b) => a.name.localeCompare(b.name)).forEach(prov => {
+                            provinceSelect.add(new Option(prov.name, prov.code));
+                        });
+                    });
+                }
+            }
+        });
+
+        // 3. When Province changes, fetch Cities
+        provinceSelect.addEventListener('change', function() {
+            citySelect.innerHTML = '<option value="">3. SELECT CITY/MUNICIPALITY</option>';
+            citySelect.disabled = true;
+            citySelect.classList.add('cursor-not-allowed', 'opacity-50');
+            fullLocation.value = '';
+
+            if (this.value && this.value !== 'NCR') {
+                fetchCities(`https://psgc.gitlab.io/api/provinces/${this.value}/cities-municipalities`);
+            }
+        });
+
+        function fetchCities(url) {
+            fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                citySelect.disabled = false;
+                citySelect.classList.remove('cursor-not-allowed', 'opacity-50');
+                data.sort((a,b) => a.name.localeCompare(b.name)).forEach(city => {
+                    citySelect.add(new Option(city.name, city.code));
+                });
+            });
+        }
+
+        // 4. When City is selected, mash them together for the backend!
+        citySelect.addEventListener('change', function() {
+            if(this.value) {
+                const rName = regionSelect.options[regionSelect.selectedIndex].text;
+                const pName = provinceSelect.options[provinceSelect.selectedIndex].text;
+                const cName = citySelect.options[citySelect.selectedIndex].text;
+                
+                // Final String: "QUEZON CITY, METRO MANILA, NATIONAL CAPITAL REGION"
+                fullLocation.value = `${cName}, ${pName}, ${rName}`;
+            } else {
+                fullLocation.value = '';
+            }
         });
     </script>
 </body>
