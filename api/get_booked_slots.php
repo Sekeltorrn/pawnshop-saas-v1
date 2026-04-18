@@ -40,7 +40,7 @@ try {
     $pdo->exec("SET search_path TO \"$schemaName\"");
 
     // Fetch appointments strictly belonging to this customer (Excluding cancelled ones)
-    $stmt = $pdo->prepare("SELECT appointment_date, appointment_time, status, customer_id 
+    $stmt = $pdo->prepare("SELECT appointment_id, appointment_date, appointment_time, status, customer_id 
                           FROM appointments 
                           WHERE customer_id = :customer_id 
                           AND status != 'cancelled'
