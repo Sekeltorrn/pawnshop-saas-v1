@@ -177,7 +177,7 @@ try {
                 </div>
                 
                 <div class="flex flex-col gap-4">
-                    <a href="/downloads/RenoGo.apk" download="RenoGo.apk" class="w-full bg-secondary text-on-secondary font-headline font-bold text-lg py-4 px-8 rounded-xl hover:opacity-90 transition-opacity ambient-shadow flex items-center justify-center gap-2">
+                    <a href="/downloads/RenoGO.apk" download="RenoGO.apk" class="w-full bg-secondary text-on-secondary font-headline font-bold text-lg py-4 px-8 rounded-xl hover:opacity-90 transition-opacity ambient-shadow flex items-center justify-center gap-2">
                         Download App
                         <span class="material-symbols-outlined">download</span>
                     </a>
