@@ -1,6 +1,6 @@
 <?php
 // views/superadmin/tenant_profile.php
-require_once 'layout_header.php';
+require_once __DIR__ . '/includes/layout_header.php';
 require_once '../../config/db_connect.php'; 
 
 // 1. Get the Tenant ID from the URL
@@ -8,7 +8,7 @@ $tenant_id = $_GET['id'] ?? null;
 
 if (!$tenant_id) {
     echo "<div class='mb-6 p-4 border border-error/50 bg-error/10 text-error font-label text-xs uppercase tracking-widest flex items-center gap-3'><span class='material-symbols-outlined'>error</span>SYSTEM_ERROR: No Node ID provided.</div>";
-    require_once 'layout_footer.php';
+    require_once __DIR__ . '/includes/layout_footer.php';
     exit;
 }
 
@@ -19,7 +19,7 @@ $tenant = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$tenant) {
     echo "<div class='mb-6 p-4 border border-error/50 bg-error/10 text-error font-label text-xs uppercase tracking-widest flex items-center gap-3'><span class='material-symbols-outlined'>error</span>SYSTEM_ERROR: Tenant Node not found in registry.</div>";
-    require_once 'layout_footer.php';
+    require_once __DIR__ . '/includes/layout_footer.php';
     exit;
 }
 
@@ -247,4 +247,4 @@ $days_active = $now->diff($created_date)->format('%a');
 
 </div>
 
-<?php require_once 'layout_footer.php'; ?>
+<?php require_once __DIR__ . '/includes/layout_footer.php'; ?>

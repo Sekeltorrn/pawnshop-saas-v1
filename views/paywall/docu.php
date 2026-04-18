@@ -1,7 +1,12 @@
 <?php
-// We expect $compliance_data to be fetched from your database in the parent shell.
-// If it doesn't exist yet (brand new user), we initialize the empty structure.
-$db_data = isset($compliance_data) && is_string($compliance_data) ? json_decode($compliance_data, true) : (is_array($compliance_data ?? null) ? $compliance_data : []);
+// Ensure we have the compliance data array from the parent shell
+$raw_comp = $compliance_data ?? [];
+
+// If it's still a string (double-encoded), decode it one last time
+if (is_string($raw_comp)) {
+    $decoded = json_decode($raw_comp, true);
+    $raw_comp = (json_last_error() === JSON_ERROR_NONE) ? $decoded : [];
+}
 
 $default_comp = [
     'gov_id'       => ['status' => 'empty', 'notes' => ''],
@@ -11,8 +16,8 @@ $default_comp = [
     'bir_2303'     => ['status' => 'empty', 'notes' => '']
 ];
 
-// Merge to prevent undefined index errors
-$comp_data = array_merge($default_comp, $db_data);
+// Merge existing data with defaults
+$comp_data = array_merge($default_comp, (array)$raw_comp);
 ?>
 
 <div class="space-y-8 pb-12">
@@ -78,8 +83,13 @@ $comp_data = array_merge($default_comp, $db_data);
                             <span class="material-symbols-outlined text-[14px] animate-spin">sync</span> In_Queue
                         </div>
                     <?php elseif ($status === 'approved'): ?>
-                        <div class="w-full bg-brand-green/10 text-brand-green border border-brand-green/30 font-black py-2.5 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined text-[14px]">verified</span> Verified
+                        <div class="w-full bg-brand-green/10 text-brand-green border border-brand-green/30 font-black py-2.5 text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[14px]">verified</span> Verified
+                            </div>
+                            <?php if ($notes): ?>
+                                <span class="text-[8px] opacity-70 italic font-mono">[Admin: <?php echo htmlspecialchars($notes); ?>]</span>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -126,8 +136,13 @@ $comp_data = array_merge($default_comp, $db_data);
                             <span class="material-symbols-outlined text-[14px] animate-spin">sync</span> In_Queue
                         </div>
                     <?php elseif ($status === 'approved'): ?>
-                        <div class="w-full bg-brand-green/10 text-brand-green border border-brand-green/30 font-black py-2.5 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined text-[14px]">verified</span> Verified
+                        <div class="w-full bg-brand-green/10 text-brand-green border border-brand-green/30 font-black py-2.5 text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[14px]">verified</span> Verified
+                            </div>
+                            <?php if ($notes): ?>
+                                <span class="text-[8px] opacity-70 italic font-mono">[Admin: <?php echo htmlspecialchars($notes); ?>]</span>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -186,8 +201,13 @@ $comp_data = array_merge($default_comp, $db_data);
                             <span class="material-symbols-outlined text-[14px] animate-spin">sync</span> In_Queue
                         </div>
                     <?php elseif ($status === 'approved'): ?>
-                        <div class="px-8 py-3 bg-brand-green/10 text-brand-green border border-brand-green/30 font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined text-[14px]">verified</span> Verified
+                        <div class="w-full bg-brand-green/10 text-brand-green border border-brand-green/30 font-black py-2.5 text-[10px] uppercase tracking-widest flex flex-col items-center justify-center gap-1">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[14px]">verified</span> Verified
+                            </div>
+                            <?php if ($notes): ?>
+                                <span class="text-[8px] opacity-70 italic font-mono">[Admin: <?php echo htmlspecialchars($notes); ?>]</span>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -229,7 +249,14 @@ $comp_data = array_merge($default_comp, $db_data);
                     <?php elseif ($status === 'pending'): ?>
                         <span class="material-symbols-outlined text-brand-orange animate-spin text-lg">sync</span>
                     <?php elseif ($status === 'approved'): ?>
-                        <span class="material-symbols-outlined text-brand-green text-lg">check_circle</span>
+                        <div class="w-full bg-brand-green/10 text-brand-green border border-brand-green/30 font-black py-1.5 px-3 text-[9px] uppercase tracking-widest flex flex-col items-center justify-center gap-0.5">
+                            <div class="flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[12px]">verified</span> Verified
+                            </div>
+                            <?php if ($notes): ?>
+                                <span class="text-[7px] opacity-70 italic font-mono">[Admin: <?php echo htmlspecialchars($notes); ?>]</span>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>
@@ -270,7 +297,14 @@ $comp_data = array_merge($default_comp, $db_data);
                     <?php elseif ($status === 'pending'): ?>
                         <span class="material-symbols-outlined text-brand-orange animate-spin text-lg">sync</span>
                     <?php elseif ($status === 'approved'): ?>
-                        <span class="material-symbols-outlined text-brand-green text-lg">check_circle</span>
+                        <div class="w-full bg-brand-green/10 text-brand-green border border-brand-green/30 font-black py-1.5 px-3 text-[9px] uppercase tracking-widest flex flex-col items-center justify-center gap-0.5">
+                            <div class="flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[12px]">verified</span> Verified
+                            </div>
+                            <?php if ($notes): ?>
+                                <span class="text-[7px] opacity-70 italic font-mono">[Admin: <?php echo htmlspecialchars($notes); ?>]</span>
+                            <?php endif; ?>
+                        </div>
                     <?php endif; ?>
                 </div>
             </div>

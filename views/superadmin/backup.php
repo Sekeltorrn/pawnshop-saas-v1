@@ -1,6 +1,8 @@
 <?php
 // views/superadmin/backup.php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // --- 1. HANDLE MANUAL BACKUP DOWNLOAD ---
 // If they clicked the backup button, generate and download a file immediately
@@ -24,7 +26,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'download') {
     exit;
 }
 
-require_once 'layout_header.php';
+require_once __DIR__ . '/includes/layout_header.php';
 
 // --- 2. MOCK DATA FOR UI (Until you build a real backups table) ---
 $backup_history = [
@@ -208,4 +210,4 @@ $backup_history = [
     </div>
 </div>
 
-<?php require_once 'layout_footer.php'; ?>
+<?php require_once __DIR__ . '/includes/layout_footer.php'; ?>

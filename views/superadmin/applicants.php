@@ -1,6 +1,6 @@
 <?php
 // views/superadmin/applicants.php
-require_once 'layout_header.php';
+require_once __DIR__ . '/includes/layout_header.php';
 require_once '../../config/supabase.php';
 
 $supabase = new Supabase();
@@ -68,6 +68,18 @@ foreach ($pending_applicants as $applicant) {
         // If the search term matches the business name OR email
         if (strpos($bName, $searchTerm) !== false || strpos($email, $searchTerm) !== false) {
             $filtered_applicants[] = $applicant;
+        }
+    }
+}
+
+// --- AUTO-INSPECT LOGIC ---
+$auto_inspect_json = null;
+if (isset($_GET['inspect'])) {
+    foreach ($pending_applicants as $app) {
+        if ($app['id'] === $_GET['inspect']) {
+            // Found the tenant matching the URL ID, prepare their data for JS
+            $auto_inspect_json = json_encode($app);
+            break;
         }
     }
 }
@@ -461,8 +473,10 @@ foreach ($pending_applicants as $applicant) {
             document.getElementById('viewer-controls').style.opacity = '1';
             
             if (data.success) {
-                // Auto-refresh the page so the PHP grabs the new status colors instantly!
-                window.location.reload(); 
+                // Instead of a blind reload, redirect back with an 'inspect' parameter
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('inspect', currentTenantId);
+                window.location.href = currentUrl.toString(); 
             } else {
                 alert("System Error: " + data.message);
             }
@@ -514,4 +528,13 @@ foreach ($pending_applicants as $applicant) {
     }
 </script>
 
-<?php require_once 'layout_footer.php'; ?>
+<?php if ($auto_inspect_json): ?>
+<script>
+    // Wait for the DOM to load, then forcefully trigger the inspection view
+    document.addEventListener('DOMContentLoaded', function() {
+        openInspection('<?= addslashes($auto_inspect_json) ?>');
+    });
+</script>
+<?php endif; ?>
+
+<?php require_once __DIR__ . '/includes/layout_footer.php'; ?>

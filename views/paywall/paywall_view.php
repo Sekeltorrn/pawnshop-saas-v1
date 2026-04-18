@@ -99,7 +99,7 @@ $activeTab = $_GET['tab'] ?? 'documents';
 <body class="text-slate-300 h-screen flex flex-col overflow-hidden selection:bg-brand-green selection:text-black">
     <div class="scanline"></div>
     
-    <header class="shrink-0 z-50 bg-[#0f1115] border-b border-white/5 px-6 h-16 flex justify-between items-center">
+    <header class="relative shrink-0 z-50 bg-[#0f1115] border-b border-white/5 px-6 h-16 flex justify-between items-center">
         <div class="flex items-center gap-4">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 bg-brand-orange rounded flex items-center justify-center">
@@ -114,15 +114,12 @@ $activeTab = $_GET['tab'] ?? 'documents';
             </div>
         </div>
 
-        <nav class="flex h-full">
+        <nav class="absolute left-1/2 -translate-x-1/2 flex h-full">
             <a href="?tab=documents" class="px-8 flex items-center text-[10px] font-black uppercase tracking-[0.2em] transition-all border-b-2 border-transparent <?php echo $activeTab === 'documents' ? 'active-tab' : 'text-slate-500 hover:text-white'; ?>">
                 Documents
             </a>
             <a href="?tab=subscription" class="px-8 flex items-center text-[10px] font-black uppercase tracking-[0.2em] transition-all border-b-2 border-transparent <?php echo $activeTab === 'subscription' ? 'active-tab' : 'text-slate-500 hover:text-white'; ?>">
                 Upgrade
-            </a>
-            <a href="?tab=demo" class="px-8 flex items-center text-[10px] font-black uppercase tracking-[0.2em] transition-all border-b-2 border-transparent <?php echo $activeTab === 'demo' ? 'active-tab' : 'text-slate-500 hover:text-white'; ?>">
-                Demo
             </a>
         </nav>
 
@@ -155,12 +152,6 @@ $activeTab = $_GET['tab'] ?? 'documents';
                 include 'subscription.php';
             } else {
                 echo "<p class='text-error-red font-mono'>Error: subscription.php file not found.</p>";
-            }
-        } elseif ($activeTab === 'demo') {
-            if (file_exists('demo.php')) {
-                include 'demo.php';
-            } else {
-                echo "<p class='text-error-red font-mono'>Error: demo.php file not found.</p>";
             }
         } else {
             include 'docu.php'; 

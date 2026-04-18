@@ -100,12 +100,29 @@ $currentData = [];
 $fetchResponse = $supabase->getComplianceData($user_id);
 
 if ($fetchResponse['code'] >= 200 && $fetchResponse['code'] < 300 && !empty($fetchResponse['body'])) {
-    $currentData = $fetchResponse['body'][0]['compliance_data'] ?? [];
-    if (!is_array($currentData)) $currentData = []; // Failsafe
+    $raw_data = $fetchResponse['body'][0]['compliance_data'] ?? [];
+    
+    // THE INCEPTION FIX: Unpack string layers until we hit the actual array
+    while (is_string($raw_data)) {
+        $decoded = json_decode($raw_data, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            break; 
+        }
+        $raw_data = $decoded;
+    }
+    
+    if (is_array($raw_data)) {
+        $currentData = $raw_data;
+    }
 }
 
 // 8. MERGE DATA: Combine existing documents with newly uploaded ones
 foreach ($compliance_updates as $key => $data) {
+    // SECURITY: If the document is already 'approved' in the database, 
+    // do not let a new upload overwrite it unless specifically handled.
+    if (($currentData[$key]['status'] ?? '') === 'approved') {
+        continue; 
+    }
     $currentData[$key] = $data;
 }
 

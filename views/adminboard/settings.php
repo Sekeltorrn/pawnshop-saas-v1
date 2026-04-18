@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
             SET ltv_percentage = ?, 
                 interest_rate = ?, 
                 service_fee = ?, 
+                penalty_rate = ?,
                 gold_rate_18k = ?, 
                 gold_rate_21k = ?, 
                 gold_rate_24k = ?,
@@ -41,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
             floatval($_POST['ltv_percentage']),
             floatval($_POST['interest_rate']),
             floatval($_POST['service_fee']),
+            floatval($_POST['penalty_rate']),
             floatval($_POST['gold_rate_18k']),
             floatval($_POST['gold_rate_21k']),
             floatval($_POST['gold_rate_24k']),
@@ -83,7 +85,7 @@ try {
     // Fallback defaults if the table is empty
     if (!$settings) {
         $settings = [
-            'ltv_percentage' => 60.00, 'interest_rate' => 3.50, 'service_fee' => 5.00,
+            'ltv_percentage' => 60.00, 'interest_rate' => 3.50, 'service_fee' => 5.00, 'penalty_rate' => 2.00,
             'gold_rate_18k' => 3000.00, 'gold_rate_21k' => 3500.00, 'gold_rate_24k' => 4200.00,
             'diamond_base_rate' => 50000.00,
             'store_open_time' => '08:00:00',
@@ -229,6 +231,15 @@ include 'includes/header.php';
                                         <span class="text-slate-500 font-mono pl-4">â‚±</span>
                                         <input type="number" step="0.01" name="service_fee" value="<?= htmlspecialchars($settings['service_fee']) ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-500 uppercase tracking-widest block mb-1">Late Penalty Rate %</label>
+                                    <div class="flex items-center bg-[#0a0b0d] border border-white/5 focus-within:border-[#ff6b00]/50 transition-colors">
+                                        <input type="number" step="0.01" name="penalty_rate" value="<?= htmlspecialchars($settings['penalty_rate'] ?? '2.00') ?>" class="w-full bg-transparent p-4 text-white text-xs font-mono outline-none">
+                                        <span class="text-slate-500 font-mono pr-4">%</span>
+                                    </div>
+                                    <p class="text-[8px] text-slate-600 font-mono uppercase mt-1">Monthly penalty applied after due date.</p>
                                 </div>
                             </div>
                         </div>

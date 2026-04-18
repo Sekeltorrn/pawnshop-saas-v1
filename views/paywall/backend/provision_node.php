@@ -1,15 +1,16 @@
 <?php
-// src/Gateways/mock_payment.php
 session_start();
+// Adjust path to your db_connect.php if your folder structure differs
 require_once __DIR__ . '/../../../config/db_connect.php';
 
 // 1. Security: Boot them out if they aren't logged in
 if (!isset($_SESSION['user_id'])) {
-    header("Location: ../Auth/login.php");
+    header("Location: ../../auth/login.php");
     exit;
 }
 
 $userId = $_SESSION['user_id'];
+$businessName = $_SESSION['business_name'] ?? 'Pawnshop System';
 
 // 2. THE PROVISIONING ENGINE (Backend Logic)
 try {
@@ -35,85 +36,36 @@ try {
     // 2. Point all future queries to this new schema
     $pdo->exec("SET search_path TO \"$schemaName\"");
 
-    // 3. The Master Table Builder
-    $sql = "
-        -- 2. CUSTOMERS (The People)
-        CREATE TABLE IF NOT EXISTS customers (
-            customer_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            auth_user_id UUID UNIQUE, 
-            first_name VARCHAR(50) NOT NULL,
-            last_name VARCHAR(50) NOT NULL,
-            email VARCHAR(100) UNIQUE,
-            password TEXT NULL,  
-            contact_no VARCHAR(20),
-            address TEXT,
-            id_type VARCHAR(50),
-            id_number VARCHAR(50),
-            id_image_url TEXT,
-            status VARCHAR(20) DEFAULT 'pending', 
-            is_walk_in BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
-        );
+    // 3. Read the master schema blueprint (Pointing to your sandbox test file)
+    $schemaFilePath = __DIR__ . '/../../../test_schema_mini.sql'; 
+    if (!file_exists($schemaFilePath)) {
+        throw new Exception("Master schema blueprint not found at: " . $schemaFilePath);
+    }
+    $rawSql = file_get_contents($schemaFilePath);
 
-        -- 3. CATEGORIES (The Rules)
-        CREATE TABLE IF NOT EXISTS categories (
-            category_id SERIAL PRIMARY KEY,
-            category_name VARCHAR(50) UNIQUE NOT NULL,
-            default_interest_rate DECIMAL(5,2) DEFAULT 3.00
-        );
+    // 4. Clean the SQL: Remove any hardcoded test schema references (like tenant_pwn_18e601)
+    $cleanSql = preg_replace('/tenant_pwn_[a-zA-Z0-9]+\./', '', $rawSql);
 
-        -- 4. INVENTORY (The Vault)
-        CREATE TABLE IF NOT EXISTS inventory (
-            item_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            category_id INT REFERENCES categories(category_id),
-            item_name VARCHAR(255) NOT NULL,
-            item_description TEXT,
-            serial_number VARCHAR(100),
-            weight_grams DECIMAL(10,2),
-            appraised_value DECIMAL(15,2),
-            item_status VARCHAR(20) DEFAULT 'in_vault', 
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
-        );
+    // 5. Execute the massive blueprint to build the tables
+    $pdo->exec($cleanSql);
 
-        -- 5. LOANS (The Money)
-        CREATE TABLE IF NOT EXISTS loans (
-            loan_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            customer_id UUID REFERENCES customers(customer_id),
-            item_id UUID REFERENCES inventory(item_id),
-            pawn_ticket_no SERIAL,
-            principal_amount DECIMAL(15,2) NOT NULL,
-            interest_rate DECIMAL(5,2) NOT NULL,
-            loan_date DATE DEFAULT CURRENT_DATE,
-            due_date DATE NOT NULL,
-            status VARCHAR(20) DEFAULT 'active', 
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
-        );
+    // E. SEED DEFAULT TENANT DATA
+    // 1. Seed standard roles
+    $pdo->exec("
+        INSERT INTO roles (role_name, permissions) VALUES 
+        ('Admin', '{\"all\": true}'), 
+        ('Appraiser', '{\"loans\": true, \"inventory\": true}'), 
+        ('Clerk', '{\"payments\": true, \"customers\": true}')
+    ");
 
-        -- 6. PAYMENTS (The Audit Trail)
-        CREATE TABLE IF NOT EXISTS payments (
-            payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            loan_id UUID REFERENCES loans(loan_id),
-            amount DECIMAL(15,2) NOT NULL,
-            payment_date TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()),
-            payment_type VARCHAR(20), 
-            or_number VARCHAR(50) 
-        );
+    // 2. Seed initial tenant settings using the business name
+    $stmtSettings = $pdo->prepare("INSERT INTO tenant_settings (shop_name) VALUES (?)");
+    $stmtSettings->execute([$businessName]);
 
-        -- 7. DEFAULT DATA 
-        INSERT INTO categories (category_name, default_interest_rate) VALUES 
-        ('Jewelry (Gold)', 3.00),
-        ('Electronics', 5.00),
-        ('Luxury Watches', 2.50)
-        ON CONFLICT DO NOTHING;
-    ";
-
-    // Execute the massive table creation script
-    $pdo->exec($sql);
-
-    // E. Commit the changes to the database!
+    // F. Commit the changes to the database!
     $pdo->commit();
 
-    // F. Update the local browser session so they can enter the app
+    // G. Update the local browser session so they can enter the app
     $_SESSION['payment_status'] = 'active';
     $_SESSION['shop_code'] = $shopCode;
     $_SESSION['schema_name'] = $schemaName;
@@ -171,11 +123,11 @@ try {
     <div class="w-full max-w-2xl mx-auto space-y-4 text-sm md:text-base">
         <p class="text-slate-500 mb-8">// INITIATING PROVISIONING PROTOCOL...</p>
         
-        <p class="delay-1">> Verifying Mock Payment Transaction... <span class="text-white bg-green-800/50 px-1 ml-2">VERIFIED</span></p>
+        <p class="delay-1">> Verifying Gateway Payment Transaction... <span class="text-white bg-green-800/50 px-1 ml-2">VERIFIED</span></p>
         
-        <p class="delay-2">> Generating Unique Identifier... <span class="text-white ml-2"><?php echo $shopCode; ?></span></p>
+        <p class="delay-2">> Generating Unique Identifier... <span class="text-white ml-2"><?php echo htmlspecialchars($shopCode); ?></span></p>
         
-        <p class="delay-3">> Forging Isolated PostgreSQL Schema... <span class="text-primary ml-2"><?php echo $schemaName; ?></span></p>
+        <p class="delay-3">> Forging Isolated PostgreSQL Schema... <span class="text-neon-green ml-2"><?php echo htmlspecialchars($schemaName); ?></span></p>
         
         <p class="delay-4">> Injecting Core System Tables... <span class="text-white bg-green-800/50 px-1 ml-2">SUCCESS</span></p>
         
@@ -186,8 +138,7 @@ try {
 
     <script>
         setTimeout(() => {
-            // Note: I adjusted this redirect path based on your folder structure screenshot
-            window.location.href = '/views/boardstaff/dashboard.php';
+            window.location.href = '../../boardstaff/dashboard.php';
         }, 4000);
     </script>
 </body>

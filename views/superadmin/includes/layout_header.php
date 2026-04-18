@@ -1,6 +1,8 @@
 <?php
 // views/superadmin/layout_header.php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // THE BOUNCER: Kick out anyone who isn't the developer
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'developer') {
@@ -147,6 +149,10 @@ function getNavClass($page, $current) {
             <a href="reports.php" class="<?= getNavClass('reports.php', $current_page) ?>">
                 <span class="material-symbols-outlined" data-icon="payments">payments</span>
                 REVENUE
+            </a>
+            <a href="payments_ledger.php" class="<?= getNavClass('payments_ledger.php', $current_page) ?>">
+                <span class="material-symbols-outlined" data-icon="payments">payments</span>
+                REVENUE_LEDGER
             </a>
             <a href="audit_logs.php" class="<?= getNavClass('audit_logs.php', $current_page) ?>">
                 <span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>

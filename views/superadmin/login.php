@@ -1,6 +1,8 @@
 <?php
 // views/superadmin/login.php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once '../../config/db_connect.php'; // Added DB connection
 
 // If you are already logged in as the developer, skip the login screen

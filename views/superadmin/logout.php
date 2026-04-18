@@ -2,7 +2,9 @@
 // views/superadmin/logout.php
 
 // 1. Initialize the session so PHP knows WHICH session to destroy
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // 2. Unset all of the session variables (Clear the data)
 $_SESSION = array();

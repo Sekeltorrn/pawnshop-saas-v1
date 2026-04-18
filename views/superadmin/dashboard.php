@@ -1,6 +1,6 @@
 <?php
 // views/superadmin/dashboard.php
-require_once 'layout_header.php';
+require_once __DIR__ . '/includes/layout_header.php';
 require_once '../../config/db_connect.php'; // Ensure this points to your Supabase PDO connection
 
 // Initialize variables
@@ -239,4 +239,4 @@ try {
     });
 </script>
 
-<?php require_once 'layout_footer.php'; ?>
+<?php require_once __DIR__ . '/includes/layout_footer.php'; ?>

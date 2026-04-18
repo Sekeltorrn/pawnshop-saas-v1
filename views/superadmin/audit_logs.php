@@ -1,6 +1,6 @@
 <?php
 // views/superadmin/audit_logs.php
-require_once 'layout_header.php';
+require_once __DIR__ . '/includes/layout_header.php';
 
 // --- PHP FILTERING LOGIC ---
 $selected_tenant = $_GET['tenant'] ?? '';
@@ -335,4 +335,4 @@ $tenant_count = 3;
     });
 </script>
 
-<?php require_once 'layout_footer.php'; ?>
+<?php require_once __DIR__ . '/includes/layout_footer.php'; ?>
