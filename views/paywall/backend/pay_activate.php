@@ -39,8 +39,8 @@ $payload = json_encode([
                 'quantity' => 1
             ]],
             'payment_method_types' => ['gcash', 'paymaya', 'card'],
-            'success_url' => 'https://pawnereno.onrender.com/paywall/backend/provision_node.php',
-            'cancel_url'  => 'https://pawnereno.onrender.com/paywall/paywall_view.php?tab=subscription',
+            'success_url' => 'https://pawnereno.onrender.com/views/paywall/backend/provision_node.php',
+            'cancel_url'  => 'https://pawnereno.onrender.com/views/paywall/paywall_view.php?tab=subscription',
             'metadata' => [
                 'user_id' => $user_id // Passing the exact 'id' from your profiles table
             ]
