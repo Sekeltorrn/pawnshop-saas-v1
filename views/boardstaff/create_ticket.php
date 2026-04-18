@@ -76,6 +76,25 @@ try {
     }
 } catch (PDOException $e) { }
 
+// 3.4 FETCH CATEGORIES
+$categories = [];
+try {
+    $stmt = $pdo->query("SELECT category_id, category_name FROM {$schemaName}.categories ORDER BY category_name ASC");
+    $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    try {
+        $stmt = $pdo->query("SELECT category_id, name AS category_name FROM {$schemaName}.categories ORDER BY name ASC");
+        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch(PDOException $ex) {}
+}
+
+// 3.5 FETCH ENTIRE ASSET MATRIX (For L2, L3, L4 Cascading)
+$full_matrix = [];
+try {
+    $stmt = $pdo->query("SELECT node_id, category_id, parent_id, name, hierarchy_level, base_appraisal_value FROM {$schemaName}.asset_matrix ORDER BY name ASC");
+    $full_matrix = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) { }
+
 $pageTitle = 'Create New Ticket';
 include 'includes/header.php';
 
@@ -148,267 +167,67 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
             </div>
 
             <!-- ASSET APPRAISAL SECTION -->
-            <div class="bg-surface-container-low p-10 border border-outline-variant/10 relative overflow-hidden group rounded-sm shadow-xl">
-                <h3 class="text-on-surface font-headline font-bold mb-8 flex items-center justify-between text-[12px] uppercase tracking-[0.3em] border-b border-outline-variant/10 pb-6 opacity-80">
+            <div class="bg-surface-container-low p-8 border border-outline-variant/10 relative overflow-hidden group rounded-sm shadow-xl mb-6">
+                <h3 class="text-on-surface font-headline font-bold mb-6 flex items-center justify-between text-[12px] uppercase tracking-[0.3em] border-b border-outline-variant/10 pb-4 opacity-80">
                     <div class="flex items-center gap-4">
-                        <span class="material-symbols-outlined text-secondary-dim text-xl">diamond</span> Asset Appraisal :: VAL_ESTIMATE
+                        <span class="material-symbols-outlined text-primary text-xl">category</span> Asset Appraisal :: VAL_ESTIMATE
                     </div>
-                    <button type="button" onclick="clearItemFields()" class="text-red-400/80 hover:text-red-400 text-[9px] border border-red-500/20 hover:bg-red-500/10 px-3 py-1 rounded-sm transition-all tracking-widest uppercase">
-                        [ RESET FIELDS ]
+                    <button type="button" onclick="resetSpawner()" class="text-red-400/80 hover:text-red-400 text-[9px] border border-red-500/20 hover:bg-red-500/10 px-3 py-1 rounded-sm transition-all tracking-widest uppercase">
+                        [ PURGE DATA ]
                     </button>
                 </h3>
-                    
-                <div class="flex gap-2 mb-8 bg-surface-container-lowest border border-outline-variant/10 p-1.5 rounded-sm">
-                    <button type="button" onclick="setMode('jewelry')" id="btn-jewelry" class="flex-1 py-4 bg-secondary-dim/10 text-secondary-dim border border-secondary-dim/20 font-headline font-bold uppercase text-[11px] tracking-[0.3em] rounded-sm transition-all">Jewelry & Precious Metals</button>
-                    <button type="button" onclick="setMode('electronics')" id="btn-electronics" class="flex-1 py-4 bg-transparent text-on-surface-variant/50 hover:text-on-surface font-headline font-bold uppercase text-[11px] tracking-[0.3em] rounded-sm transition-all border border-transparent">Electronics & Assets</button>
-                </div>
+                <label class="text-[10px] font-headline font-bold text-primary uppercase block mb-3 tracking-widest">Asset Category (L1)</label>
+                <select id="asset_category" onchange="filterMatrix('L2')" class="w-full bg-[#1a1c19] border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest focus:border-primary/50 transition-all cursor-pointer">
+                    <option value="" disabled selected>-- SELECT ASSET CATEGORY --</option>
+                    <?php foreach($categories as $cat): ?>
+                        <option value="<?= $cat['category_id'] ?>"><?= htmlspecialchars($cat['category_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
 
-                <input type="hidden" name="jewelry_karat_label" id="jewelry_karat_label">
-                <input type="hidden" name="item_type" id="input-item-type" value="jewelry">
-                <input type="hidden" name="item_name" id="final_item_name">
-                <input type="hidden" name="item_condition_text" id="final_item_condition">
-                <input type="hidden" name="item_description" id="final_item_description">
-
-                <div id="jewelry-fields" class="space-y-8">
-                    
+            <div id="box-identity" class="bg-surface-container-low p-8 border border-outline-variant/10 relative overflow-hidden group rounded-sm shadow-xl mb-6 border-l-4 border-l-primary/50">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                        <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.25em] block mb-3 opacity-50">Primary Classification</label>
-                        <select id="jewelry-desc-select" name="primary_classification" onchange="handleJewelrySelection(this)" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none focus:border-secondary-dim/50 rounded-sm uppercase tracking-widest transition-all">
-                            <?php $j_type = $draft['primary_classification'] ?? 'Gold Ring'; ?>
-                            <option value="Gold Ring" <?= $j_type == 'Gold Ring' ? 'selected' : '' ?>>Gold Ring</option>
-                            <option value="Gold Necklace" <?= $j_type == 'Gold Necklace' ? 'selected' : '' ?>>Gold Necklace</option>
-                            <option value="Diamond Ring" <?= $j_type == 'Diamond Ring' ? 'selected' : '' ?>>Diamond Ring</option>
-                            <option value="Others" <?= $j_type == 'Others' ? 'selected' : '' ?>>Other (Specify)</option>
+                        <label id="label_l2" class="text-[10px] font-headline font-bold text-primary uppercase block mb-3 tracking-widest">Classification</label>
+                        <select id="matrix_classification" onchange="filterMatrix('L3'); triggerSpawner(this.value);" class="w-full bg-[#1a1c19] border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest transition-all cursor-pointer focus:border-primary/50">
+                            <option value="" disabled selected>-- SELECT CLASS --</option>
                         </select>
-                        <input type="text" id="custom-jewelry-desc" name="other_classification" value="<?= htmlspecialchars($draft['other_classification'] ?? '') ?>" placeholder="MANUAL CLASSIFICATION ENTRY..." class="hidden w-full bg-surface-container-lowest border border-outline-variant/20 border-l-4 border-l-secondary-dim p-5 text-on-surface text-[12px] font-headline font-bold mt-3 outline-none rounded-sm tracking-widest">
                     </div>
-
-                    <div id="gold-assessment-block" class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-                        <div>
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Karat Authority (Rate/g)</label>
-                            <select name="jewelry_karat" id="karat" onchange="calculate()" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                <?php $k_rate = $draft['jewelry_karat'] ?? $gold_rate_18k; ?>
-                                <option value="<?= $gold_rate_24k ?>" <?= (abs($k_rate - $gold_rate_24k) < 0.01) ? 'selected' : '' ?>>24K - ₱<?= number_format($gold_rate_24k, 2) ?>/g</option>
-                                <option value="<?= $gold_rate_21k ?>" <?= (abs($k_rate - $gold_rate_21k) < 0.01) ? 'selected' : '' ?>>21K - ₱<?= number_format($gold_rate_21k, 2) ?>/g</option>
-                                <option value="<?= $gold_rate_18k ?>" <?= (abs($k_rate - $gold_rate_18k) < 0.01) ? 'selected' : '' ?>>18K - ₱<?= number_format($gold_rate_18k, 2) ?>/g</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Gross Weight (Grams)</label>
-                            <input type="number" id="weight" name="weight" value="<?= htmlspecialchars($draft['weight'] ?? '') ?>" oninput="calculate()" step="0.01" placeholder="0.00g" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[14px] font-headline font-bold outline-none rounded-sm tracking-widest placeholder:text-on-surface-variant/20">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Stone Deduction (g)</label>
-                            <input type="number" id="stone_deduction" name="stone_deduction" value="<?= htmlspecialchars($draft['stone_deduction'] ?? '0') ?>" oninput="calculate()" step="0.01" placeholder="0.00g" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[14px] font-headline font-bold outline-none rounded-sm tracking-widest">
-                        </div>
+                    <div>
+                        <label id="label_l3" class="text-[10px] font-headline font-bold text-primary uppercase block mb-3 tracking-widest">Brand Authority</label>
+                        <select id="matrix_brand" onchange="filterMatrix('L4'); calculateDynamic();" disabled class="w-full bg-[#1a1c19] border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest transition-all cursor-pointer opacity-50 disabled:cursor-not-allowed">
+                            <option value="" disabled selected>-- PENDING --</option>
+                        </select>
                     </div>
-
-                    <div id="stone-assessment-block" class="hidden bg-surface-container-lowest border border-secondary-dim/20 p-8 relative rounded-sm shadow-inner">
-                        <div class="absolute top-0 left-0 w-2 h-full bg-secondary-dim opacity-40"></div>
-                        <p class="text-[11px] font-headline font-bold text-secondary-dim uppercase tracking-[0.4em] mb-8 border-b border-secondary-dim/10 pb-4 italic">4C's Appraisal Matrix</p>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                            <div>
-                                <label class="text-[9px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Aesthetic Cut</label>
-                                <select id="stone_cut" name="stone_cut" onchange="calculate()" class="w-full bg-surface-container-highest border border-outline-variant/10 p-4 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                    <?php $s_cut = $draft['stone_cut'] ?? '1.0'; ?>
-                                    <option value="1.1" <?= $s_cut == '1.1' ? 'selected' : '' ?>>Excellent</option>
-                                    <option value="1.05" <?= $s_cut == '1.05' ? 'selected' : '' ?>>Very Good</option>
-                                    <option value="1.0" <?= $s_cut == '1.0' ? 'selected' : '' ?>>Good</option>
-                                    <option value="0.9" <?= $s_cut == '0.9' ? 'selected' : '' ?>>Fair</option>
-                                    <option value="0.8" <?= $s_cut == '0.8' ? 'selected' : '' ?>>Poor</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[9px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Chromatic Grade</label>
-                                <select id="stone_color" name="stone_color" onchange="calculate()" class="w-full bg-surface-container-highest border border-outline-variant/10 p-4 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                    <?php $s_col = $draft['stone_color'] ?? '1.0'; ?>
-                                    <option value="1.2" <?= $s_col == '1.2' ? 'selected' : '' ?>>Colorless D-F</option>
-                                    <option value="1.0" <?= $s_col == '1.0' ? 'selected' : '' ?>>Near Colorless G-J</option>
-                                    <option value="0.8" <?= $s_col == '0.8' ? 'selected' : '' ?>>Faint K-M</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[9px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Clarity Rating</label>
-                                <select id="stone_clarity" name="stone_clarity" onchange="calculate()" class="w-full bg-surface-container-highest border border-outline-variant/10 p-4 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                    <?php $s_cla = $draft['stone_clarity'] ?? '1.1'; ?>
-                                    <option value="1.3" <?= $s_cla == '1.3' ? 'selected' : '' ?>>FL/IF</option>
-                                    <option value="1.2" <?= $s_cla == '1.2' ? 'selected' : '' ?>>VVS1/VVS2</option>
-                                    <option value="1.1" <?= $s_cla == '1.1' ? 'selected' : '' ?>>VS1/VS2</option>
-                                    <option value="0.9" <?= $s_cla == '0.9' ? 'selected' : '' ?>>SI1/SI2</option>
-                                    <option value="0.7" <?= $s_cla == '0.7' ? 'selected' : '' ?>>I1/I2/I3</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-[9px] font-headline font-bold text-secondary-dim uppercase block mb-3 tracking-widest">Base Rate per Carat (₱)</label>
-                                <input type="number" id="stone_rate" name="stone_rate" value="<?= $diamond_base_rate ?>" step="1000" class="w-full bg-surface-container-highest border border-secondary-dim/30 p-4 text-secondary-dim font-headline font-bold text-[14px] outline-none rounded-sm tracking-widest">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="text-[11px] font-headline font-bold text-secondary-dim uppercase block mb-3 tracking-[0.2em]">Asset Weight (Carats)</label>
-                            <input type="number" id="stone_carat" name="stone_carat" value="<?= htmlspecialchars($draft['stone_carat'] ?? '') ?>" step="0.01" placeholder="0.00 ct" class="w-full bg-surface-container-highest border border-secondary-dim/40 p-6 text-on-surface font-headline font-bold text-2xl outline-none rounded-sm tracking-widest placeholder:text-on-surface-variant/10 shadow-2xl">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Physical Verification Condition</label>
-                            <select id="jewelry-condition" name="jewelry_condition_select" onchange="toggleCustomInput(this, 'custom-jewelry-condition')" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                <?php $j_cond = $draft['jewelry_condition_select'] ?? 'Good / Wearable'; ?>
-                                <option value="Good / Wearable" <?= $j_cond == 'Good / Wearable' ? 'selected' : '' ?>>Good / Wearable</option>
-                                <option value="Broken / Scrap" <?= $j_cond == 'Broken / Scrap' ? 'selected' : '' ?>>Broken / Scrap</option>
-                                <option value="Others" <?= $j_cond == 'Others' ? 'selected' : '' ?>>Other (Specify)</option>
-                            </select>
-                            <input type="text" id="custom-jewelry-condition" name="other_condition" value="<?= htmlspecialchars($draft['other_condition'] ?? '') ?>" placeholder="SPECIFY CONDITION DATA..." class="hidden w-full bg-surface-container-lowest border border-outline-variant/20 border-l-4 border-l-secondary-dim p-5 text-on-surface text-[12px] font-headline font-bold mt-3 outline-none rounded-sm tracking-widest">
-                        </div>
-                        <div class="bg-surface-container-lowest border border-outline-variant/10 p-5 rounded-sm">
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Authenticity Verification (Kill-Switch)</label>
-                            <div class="flex gap-4">
-                                <label class="flex items-center gap-2 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer text-error">
-                                    <input type="checkbox" id="auth-magnet" name="auth_magnet" <?= isset($draft['auth_magnet']) ? 'checked' : '' ?> onchange="calculate()" class="accent-error size-4"> Magnet Test Passed
-                                </label>
-                                <label class="flex items-center gap-2 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer text-error">
-                                    <input type="checkbox" id="auth-acid" name="auth_acid" <?= isset($draft['auth_acid']) ? 'checked' : '' ?> onchange="calculate()" class="accent-error size-4"> Acid Test (Nitric) Passed
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div id="electronics-fields" class="hidden space-y-8">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Device Classification</label>
-                            <select id="elec-type" name="primary_classification_elec" onchange="calculate()" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                <?php $e_type = $draft['primary_classification_elec'] ?? 'Smartphone'; ?>
-                                <option <?= $e_type == 'Smartphone' ? 'selected' : '' ?>>Smartphone</option>
-                                <option <?= $e_type == 'Laptop' ? 'selected' : '' ?>>Laptop</option>
-                                <option <?= $e_type == 'Tablet' ? 'selected' : '' ?>>Tablet</option>
-                                <option <?= $e_type == 'Console' ? 'selected' : '' ?>>Console</option>
-                                <option <?= $e_type == 'Camera' ? 'selected' : '' ?>>Camera</option>
-                                <option <?= $e_type == 'Watch' ? 'selected' : '' ?>>Watch</option>
-                                <option <?= $e_type == 'Other' ? 'selected' : '' ?>>Other</option>
-                            </select>
-                        </div>
-                        <div class="md:col-span-2">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Brand Authority</label>
-                                    <select id="elec-brand" name="elec_brand" onchange="handleBrandChange()" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                        <?php $e_brand = $draft['elec_brand'] ?? ''; ?>
-                                        <option value="" <?= $e_brand == '' ? 'selected' : '' ?>>Select Brand</option>
-                                        <option value="Apple" <?= $e_brand == 'Apple' ? 'selected' : '' ?>>Apple</option>
-                                        <option value="Samsung" <?= $e_brand == 'Samsung' ? 'selected' : '' ?>>Samsung</option>
-                                        <option value="Oppo" <?= $e_brand == 'Oppo' ? 'selected' : '' ?>>Oppo</option>
-                                        <option value="Vivo" <?= $e_brand == 'Vivo' ? 'selected' : '' ?>>Vivo</option>
-                                        <option value="Realme" <?= $e_brand == 'Realme' ? 'selected' : '' ?>>Realme</option>
-                                        <option value="Xiaomi" <?= $e_brand == 'Xiaomi' ? 'selected' : '' ?>>Xiaomi</option>
-                                        <option value="Huawei" <?= $e_brand == 'Huawei' ? 'selected' : '' ?>>Huawei</option>
-                                        <option value="Other" <?= $e_brand == 'Other' ? 'selected' : '' ?>>Other</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Model Registry</label>
-                                    <input type="text" id="elec-model" name="elec_model" oninput="calculate()" placeholder="e.g. iPhone 15 Pro Max" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Asset Tracking Index (Serial / IMEI)</label>
-                            <input type="text" id="elec-serial" name="electronics_serial" value="<?= htmlspecialchars($draft['electronics_serial'] ?? '') ?>" placeholder="REQUIRED FOR POLICE_TX" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                        </div>
-                        <div>
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Physical Depreciation Index</label>
-                            <select id="elec-condition" onchange="calculate()" class="w-full bg-surface-container-highest border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest">
-                                <option value="1.0">Mint / Seal Intact (100%)</option>
-                                <option value="0.8" selected>Good / Minimal Wear (80%)</option>
-                                <option value="0.6">Fair / Heavy Usage (60%)</option>
-                            </select>
-                        </div>
-                        <div id="audit-ios" class="hidden md:col-span-2 space-y-4">
-                            <label class="text-[10px] font-headline font-bold text-error uppercase block tracking-[0.3em] opacity-80">iOS Security Threshold Audit</label>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-error/5 p-5 border border-error/20 rounded-sm">
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group text-error">
-                                    <input type="checkbox" id="ios-cloud" name="ios_cloud" <?= isset($draft['ios_cloud']) ? 'checked' : '' ?> onchange="calculate()" class="accent-error size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span>iCloud Signed Out</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="ios-findmy" name="ios_findmy" <?= isset($draft['ios_findmy']) ? 'checked' : '' ?> onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span>Find My Disabled</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="ios-biometric" name="ios_biometric" <?= isset($draft['ios_biometric']) ? 'checked' : '' ?> onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span>FaceID/TouchID OK</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div id="audit-android" class="hidden md:col-span-2 space-y-4">
-                            <label class="text-[10px] font-headline font-bold text-primary-dim uppercase block tracking-[0.3em] opacity-80">Android OS Integrity Audit</label>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-primary/5 p-5 border border-primary/20 rounded-sm">
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group text-primary-dim">
-                                    <input type="checkbox" id="android-google" name="android_google" <?= isset($draft['android_google']) ? 'checked' : '' ?> onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span>Google Account (FRP) Removed</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="android-oem" name="android_oem" <?= isset($draft['android_oem']) ? 'checked' : '' ?> onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span>OEM Unlocked</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="android-btns" name="android_btns" <?= isset($draft['android_btns']) ? 'checked' : '' ?> onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span>Hardware Buttons OK</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="md:col-span-2">
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Universal Functional Handoff</label>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface-container-highest/40 p-5 border border-outline-variant/10 rounded-sm">
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="elec-audit-power" onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span class="group-hover:text-primary transition-colors">Power/Buttons</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="elec-audit-display" onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span class="group-hover:text-primary transition-colors">Display/Touch</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="elec-audit-wifi" onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span class="group-hover:text-primary transition-colors">Wi-Fi / Bluetooth</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="elec-audit-battery" onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span class="group-hover:text-primary transition-colors">Battery Health >80%</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="md:col-span-2">
-                            <label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">Physical Assets & Accessories</label>
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-surface-container-highest/40 p-5 border border-outline-variant/10 rounded-sm">
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="elec-acc-box" onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span class="group-hover:text-primary transition-colors">Original Box (+2%)</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="elec-acc-charger" onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span class="group-hover:text-primary transition-colors">Original Charger (+3%)</span>
-                                </label>
-                                <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group">
-                                    <input type="checkbox" id="elec-acc-receipt" onchange="calculate()" class="accent-primary size-4 rounded-sm border-white/10 bg-black/20">
-                                    <span class="group-hover:text-primary transition-colors">Receipt / Warranty</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <div class="md:col-span-2">
-                            <label class="text-[10px] font-headline font-bold text-primary uppercase block mb-3 tracking-widest">Real-World Market Value (₱)</label>
-                            <input type="number" id="elec-market-val" placeholder="Current secondary market price..." class="w-full bg-surface-container-highest border border-primary/30 p-6 text-primary font-headline font-bold text-xl outline-none rounded-sm tracking-widest shadow-inner">
-                        </div>
+                    <div>
+                        <label id="label_l4" class="text-[10px] font-headline font-bold text-primary uppercase block mb-3 tracking-widest">Model Registry</label>
+                        <select id="matrix_model" onchange="calculateDynamic()" disabled class="w-full bg-[#1a1c19] border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest transition-all cursor-pointer opacity-50 disabled:cursor-not-allowed">
+                            <option value="" disabled selected>-- PENDING --</option>
+                        </select>
                     </div>
                 </div>
             </div>
+
+            <div id="box-specs" class="bg-surface-container-low p-8 border border-outline-variant/10 relative overflow-hidden group rounded-sm shadow-xl mb-6">
+                <h4 id="spec_header" class="text-[10px] font-headline font-bold text-on-surface-variant uppercase mb-6 tracking-[0.3em] opacity-80 border-b border-outline-variant/5 pb-3">Device Specifications</h4>
+                <div id="dynamic-specs-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div id="specs-placeholder" class="col-span-full text-[10px] font-headline text-on-surface-variant/50 uppercase tracking-widest italic py-4">-- Awaiting Classification --</div>
+                </div>
+            </div>
+
+            <div id="box-tests" class="bg-surface-container-low p-8 border border-outline-variant/10 relative overflow-hidden group rounded-sm shadow-xl mb-6">
+                <div id="dynamic-tests-container" class="space-y-4 mb-8">
+                    <div id="tests-placeholder" class="col-span-full text-[10px] font-headline text-on-surface-variant/50 uppercase tracking-widest italic py-4">-- Awaiting Classification --</div>
+                </div>
+                
+                <div class="mt-8 border-t border-outline-variant/10 pt-8">
+                    <label class="text-[10px] font-headline font-bold text-primary uppercase block mb-3 tracking-widest">Market Value Appraisal (Base ₱)</label>
+                    <input type="number" id="base_market_value" oninput="calculateDynamic()" step="0.01" placeholder="0.00" class="w-full bg-surface-container-highest border border-primary/30 p-6 text-primary font-headline font-bold text-2xl outline-none rounded-sm tracking-widest shadow-inner">
+                </div>
+            </div>
+
+            <input type="hidden" name="item_name" id="final_item_name">
+            <input type="hidden" name="item_description" id="final_item_description">
 
             <!-- VAULT ROUTING SECTION -->
             <div class="bg-surface-container-low p-10 border border-outline-variant/10 relative overflow-hidden group rounded-sm shadow-xl">
@@ -503,84 +322,256 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
 
 <script>
     const CUSTOMERS = <?= json_encode($customer_data) ?>;
-    const GLOBAL_SETTINGS = { ltv: <?= $ltv_ratio ?>, interest_rate: <?= $month_1_rate ?>, service_charge: <?= $service_fee ?> };
-    let currentMode = 'jewelry';
+    const GLOBAL_SETTINGS = { 
+        ltv: <?= $ltv_ratio ?>, 
+        interest_rate: <?= $month_1_rate ?>, 
+        service_charge: <?= $service_fee ?>,
+        diamond_base: <?= $diamond_base_rate ?? 50000 ?>,
+        rates: {
+            "18K": <?= $gold_rate_18k ?? 3000 ?>,
+            "21K": <?= $gold_rate_21k ?? 3500 ?>,
+            "24K": <?= $gold_rate_24k ?? 4200 ?>,
+            "14K": <?= ($gold_rate_18k ?? 3000) * 0.77 ?>, 
+            "22K": <?= ($gold_rate_24k ?? 4200) * 0.91 ?>  
+        }
+    };
+    const FULL_MATRIX = <?= json_encode($full_matrix) ?>;
 
+    function filterMatrix(targetLevel) {
+        const catSelect = document.getElementById('asset_category');
+        const catId = catSelect.value;
+        const catText = catSelect.options[catSelect.selectedIndex].text.toLowerCase();
+        
+        if (targetLevel === 'L2') {
+            document.getElementById('box-identity').classList.remove('hidden');
+            
+            const l2Label = document.getElementById('label_l2');
+            const l3Label = document.getElementById('label_l3');
+            const l4Label = document.getElementById('label_l4');
+            const specHeader = document.getElementById('spec_header');
+
+            if (catText.includes('electronic') || catText.includes('device')) {
+                l2Label.innerText = 'Device Classification';
+                l3Label.innerText = 'Brand Authority';
+                l4Label.innerText = 'Model Registry';
+                specHeader.innerText = 'Device Specifications';
+            } else if (catText.includes('jewelry') || catText.includes('gold') || catText.includes('metal') || catText.includes('diamond')) {
+                l2Label.innerText = 'Primary Classification';
+                l3Label.innerText = 'Secondary Class (Type)';
+                l4Label.innerText = 'Specific Variation (Optional)';
+                specHeader.innerText = 'Jewelry Attributes & Metrics';
+            } else {
+                l2Label.innerText = 'Asset Classification';
+                l3Label.innerText = 'Sub-Category';
+                l4Label.innerText = 'Specific Model';
+                specHeader.innerText = 'Asset Specifications';
+            }
+
+            const classSelect = document.getElementById('matrix_classification');
+            classSelect.innerHTML = '<option value="" disabled selected>-- SELECT CLASS --</option>';
+            
+            FULL_MATRIX.forEach(node => {
+                if (node.category_id === catId && node.hierarchy_level === 'L2_Classification') {
+                    let opt = new Option(node.name, node.node_id);
+                    opt.setAttribute('data-base', node.base_appraisal_value || 0);
+                    classSelect.appendChild(opt);
+                }
+            });
+            classSelect.disabled = false;
+            classSelect.classList.remove('opacity-50', 'disabled:cursor-not-allowed');
+            
+            // Reset downstream
+            document.getElementById('matrix_brand').innerHTML = '<option value="" disabled selected>-- PENDING --</option>';
+            document.getElementById('matrix_brand').disabled = true;
+            document.getElementById('matrix_brand').classList.add('opacity-50', 'disabled:cursor-not-allowed');
+            
+            document.getElementById('matrix_model').innerHTML = '<option value="" disabled selected>-- PENDING --</option>';
+            document.getElementById('matrix_model').disabled = true;
+            document.getElementById('matrix_model').classList.add('opacity-50', 'disabled:cursor-not-allowed');
+            
+            document.getElementById('dynamic-specs-container').innerHTML = '';
+            document.getElementById('dynamic-tests-container').innerHTML = '';
+            document.getElementById('base_market_value').value = '';
+        }
+        
+        if (targetLevel === 'L3') {
+            const l2Id = document.getElementById('matrix_classification').value;
+            const brandSelect = document.getElementById('matrix_brand');
+            brandSelect.innerHTML = '<option value="" disabled selected>-- SELECT BRAND --</option>';
+            
+            let foundBrand = false;
+            FULL_MATRIX.forEach(node => {
+                if (node.parent_id === l2Id && node.hierarchy_level === 'L3_Brand') {
+                    brandSelect.appendChild(new Option(node.name, node.node_id));
+                    foundBrand = true;
+                }
+            });
+            
+            if (foundBrand) {
+                brandSelect.disabled = false;
+                brandSelect.classList.remove('opacity-50', 'disabled:cursor-not-allowed');
+            }
+            
+            // Reset L4
+            document.getElementById('matrix_model').innerHTML = '<option value="" disabled selected>-- PENDING --</option>';
+            document.getElementById('matrix_model').disabled = true;
+            document.getElementById('matrix_model').classList.add('opacity-50', 'disabled:cursor-not-allowed');
+        }
+        
+        if (targetLevel === 'L4') {
+            const l3Id = document.getElementById('matrix_brand').value;
+            const modelSelect = document.getElementById('matrix_model');
+            modelSelect.innerHTML = '<option value="" disabled selected>-- SELECT MODEL --</option>';
+            
+            let foundModel = false;
+            FULL_MATRIX.forEach(node => {
+                if (node.parent_id === l3Id && node.hierarchy_level === 'L4_Model') {
+                    let opt = new Option(node.name, node.node_id);
+                    opt.setAttribute('data-base', node.base_appraisal_value);
+                    modelSelect.appendChild(opt);
+                    foundModel = true;
+                }
+            });
+            
+            if (foundModel) {
+                modelSelect.disabled = false;
+                modelSelect.classList.remove('opacity-50', 'disabled:cursor-not-allowed');
+            }
+        }
+    }
+    // --- THE TRIPLE-THREAT SPAWNER ENGINE ---
+
+    async function triggerSpawner(nodeId) {
+        const select = document.getElementById('matrix_classification');
+        const baseVal = select.options[select.selectedIndex]?.getAttribute('data-base');
+        if (baseVal && baseVal !== '0') {
+            document.getElementById('base_market_value').value = baseVal;
+        }
+
+        const specContainer = document.getElementById('dynamic-specs-container');
+        const testContainer = document.getElementById('dynamic-tests-container');
+
+        specContainer.innerHTML = '<div class="col-span-full text-[10px] text-primary animate-pulse tracking-widest">-- FETCHING SPECS... --</div>';
+        testContainer.innerHTML = '<div class="col-span-full text-[10px] text-primary animate-pulse tracking-widest">-- FETCHING TESTS... --</div>';
+
+        // 1. Fetch Specs Safely
+        try {
+            const specRes = await fetch('../adminboard/api_get_attributes.php?node_id=' + nodeId);
+            const specText = await specRes.text(); // Get raw text first to prevent JSON crash
+            
+            try {
+                const specs = JSON.parse(specText);
+                if (specs.error) {
+                    specContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest p-4 border border-error/20 bg-error/10">API SQL ERROR: ${specs.error}</div>`;
+                } else if (!Array.isArray(specs)) {
+                    specContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest p-4 border border-error/20 bg-error/10">API FORMAT ERROR. RECEIVED: ${specText.substring(0, 50)}...</div>`;
+                } else {
+                    renderSpecs(specs);
+                }
+            } catch (parseErr) {
+                specContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest p-4 border border-error/20 bg-error/10">PHP OUTPUT ERROR (NOT JSON): ${specText.substring(0, 100)}</div>`;
+            }
+        } catch(e) { 
+            specContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest">NETWORK ERROR: ${e.message}</div>`;
+        }
+
+        // 2. Fetch Tests Safely
+        try {
+            const testRes = await fetch('../adminboard/api_get_tests.php?node_id=' + nodeId);
+            const testText = await testRes.text();
+            
+            try {
+                const tests = JSON.parse(testText);
+                if (tests.error) {
+                    testContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest p-4 border border-error/20 bg-error/10">API SQL ERROR: ${tests.error}</div>`;
+                } else if (!Array.isArray(tests)) {
+                    testContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest p-4 border border-error/20 bg-error/10">API FORMAT ERROR.</div>`;
+                } else {
+                    renderTests(tests);
+                }
+            } catch (parseErr) {
+                testContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest p-4 border border-error/20 bg-error/10">PHP OUTPUT ERROR.</div>`;
+            }
+        } catch(e) { 
+            testContainer.innerHTML = `<div class="col-span-full text-[10px] text-error font-black uppercase tracking-widest">NETWORK ERROR: ${e.message}</div>`;
+        }
+
+        calculateDynamic();
+    }
+
+    function renderSpecs(specs) {
+        const container = document.getElementById('dynamic-specs-container');
+        container.innerHTML = ''; 
+        
+        if (specs.length === 0) {
+            container.innerHTML = '<div class="col-span-full text-[10px] font-headline text-error/80 uppercase tracking-widest italic py-4">-- NO SPECS DEFINED FOR THIS CLASSIFICATION --</div>';
+            return;
+        }
+
+        specs.forEach(spec => {
+            let html = `<div><label class="text-[10px] font-headline font-bold text-on-surface-variant uppercase block mb-3 tracking-widest opacity-50">${spec.label}</label>`;
+            if (spec.field_type.toLowerCase() === 'select') {
+                let opts = [];
+                try {
+                    opts = typeof spec.options === 'string' ? JSON.parse(spec.options || '[]') : (spec.options || []);
+                } catch(e) { opts = ["PARSE_ERROR"]; }
+                
+                html += `<select class="dynamic-spec w-full bg-[#1a1c19] border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest focus:border-primary/50 transition-all cursor-pointer" data-label="${spec.label}" onchange="calculateDynamic()">`;
+                if (Array.isArray(opts)) opts.forEach(opt => html += `<option value="${opt}">${opt}</option>`);
+                html += `</select>`;
+            } else {
+                html += `<input type="text" class="dynamic-spec w-full bg-[#1a1c19] border border-outline-variant/20 p-5 text-on-surface text-[12px] font-headline font-bold outline-none rounded-sm uppercase tracking-widest" data-label="${spec.label}" oninput="calculateDynamic()">`;
+            }
+            html += `</div>`;
+            container.innerHTML += html;
+        });
+    }
+
+    function renderTests(tests) {
+        const container = document.getElementById('dynamic-tests-container');
+        container.innerHTML = ''; // Clear container
+        
+        if (!tests || tests.length === 0) {
+            container.innerHTML = '<div class="col-span-full text-[10px] font-headline text-error/80 uppercase tracking-widest italic py-4">-- NO TESTS DEFINED IN DATABASE --</div>';
+            return;
+        }
+
+        let gridHtml = `
+        <label class="text-[10px] font-headline font-bold text-error uppercase block tracking-[0.3em] opacity-80 mb-3">Functional Test Protocols</label>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 bg-error/5 p-5 border border-error/20 rounded-sm">`;
+        
+        tests.forEach(test => {
+            const impactColor = test.impact_type === 'penalty' ? 'text-error' : 'text-primary';
+            const accentColor = test.impact_type === 'penalty' ? 'accent-error' : 'accent-primary';
+            const sign = test.impact_type === 'penalty' ? '-' : '+';
+            
+            gridHtml += `
+            <label class="flex items-center gap-3 text-[10px] font-headline font-bold uppercase tracking-widest cursor-pointer group text-on-surface">
+                <input type="checkbox" class="dynamic-test ${accentColor} size-4 rounded-sm border-white/10 bg-black/20" 
+                       data-impact-type="${test.impact_type}" 
+                       data-impact-value="${test.impact_value}"
+                       data-test-name="${test.test_name}"
+                       onchange="calculateDynamic()">
+                <span class="group-hover:${impactColor} transition-colors">${test.test_name} <span class="${impactColor}">(${sign}${test.impact_value}%)</span></span>
+            </label>`;
+        });
+        gridHtml += '</div>';
+        container.innerHTML = gridHtml;
+    }
 
     function updateCustomerInfo() {
-        const custId = document.getElementById('customer_select').value;
+        const select = document.getElementById('customer_select');
+        const cid = select.value;
         const card = document.getElementById('customer_info_card');
-        if (CUSTOMERS[custId]) {
-            document.getElementById('info_name').innerText = CUSTOMERS[custId].name;
-            document.getElementById('info_contact').innerText = CUSTOMERS[custId].contact;
-            document.getElementById('info_id').innerText = `${CUSTOMERS[custId].id_type} - VERIFIED`;
+        if (cid && CUSTOMERS[cid]) {
+            const c = CUSTOMERS[cid];
+            document.getElementById('info_name').innerText = c.name;
+            document.getElementById('info_contact').innerText = c.contact;
+            document.getElementById('info_id').innerText = `${c.id_type} / ${c.id_number}`;
             card.classList.remove('hidden');
         } else {
             card.classList.add('hidden');
         }
-    }
-
-    function toggleCustomInput(selectEl, inputId) {
-        if (!selectEl) return;
-        const inputEl = document.getElementById(inputId);
-        if (!inputEl) return;
-
-        // Support both "Other" and "Others" classification values
-        const isOther = (selectEl.value === 'Other' || selectEl.value === 'Others');
-        
-        if (isOther) {
-            inputEl.classList.remove('hidden');
-            inputEl.required = true;
-        } else {
-            inputEl.classList.add('hidden');
-            inputEl.required = false;
-        }
-    }
-
-    function handleJewelrySelection(selectEl) {
-        toggleCustomInput(selectEl, 'custom-jewelry-desc');
-        const stoneBlock = document.getElementById('stone-assessment-block');
-        const goldBlock = document.getElementById('gold-assessment-block');
-        
-        if (selectEl.value.includes('Diamond')) {
-            stoneBlock.classList.remove('hidden');
-            goldBlock.classList.add('hidden');
-        } else {
-            stoneBlock.classList.add('hidden');
-            goldBlock.classList.remove('hidden');
-        }
-        calculate();
-    }
-
-    function setMode(mode) {
-        currentMode = mode;
-        document.getElementById('input-item-type').value = mode;
-        document.getElementById('jewelry-fields').classList.toggle('hidden', mode !== 'jewelry');
-        document.getElementById('electronics-fields').classList.toggle('hidden', mode !== 'electronics');
-
-        const activeJ = "flex-1 py-4 bg-secondary-dim/10 text-secondary-dim border border-secondary-dim/20 font-headline font-bold uppercase text-[11px] tracking-[0.3em] rounded-sm transition-all";
-        const inactive = "flex-1 py-4 bg-transparent text-on-surface-variant/50 hover:text-on-surface font-headline font-bold uppercase text-[11px] tracking-[0.3em] rounded-sm transition-all border border-transparent";
-        const activeE = "flex-1 py-4 bg-primary/10 text-primary border border-primary/20 font-headline font-bold uppercase text-[11px] tracking-[0.3em] rounded-sm transition-all";
-        
-        document.getElementById('btn-jewelry').className = mode === 'jewelry' ? activeJ : inactive;
-        document.getElementById('btn-electronics').className = mode === 'electronics' ? activeE : inactive;
-        calculate();
-    }
-
-    function handleBrandChange() {
-        const brand = document.getElementById('elec-brand').value;
-        const iosBlock = document.getElementById('audit-ios');
-        const androidBlock = document.getElementById('audit-android');
-        
-        iosBlock.classList.add('hidden');
-        androidBlock.classList.add('hidden');
-        
-        if (brand === 'Apple') {
-            iosBlock.classList.remove('hidden');
-        } else if (brand !== '' && brand !== 'Other') {
-            androidBlock.classList.remove('hidden');
-        }
-        calculate();
     }
 
     function handleFormSubmit(e) {
@@ -590,157 +581,115 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
             e.preventDefault();
             return false;
         }
-        finalizeItemName();
+        calculateDynamic();
         return true;
     }
 
-    function finalizeItemName() {
-        let finalName = '', finalCond = '', finalDesc = '';
-        if (currentMode === 'jewelry') {
-            const nSel = document.getElementById('jewelry-desc-select'), nCus = document.getElementById('custom-jewelry-desc');
-            const cSel = document.getElementById('jewelry-condition'), cCus = document.getElementById('custom-jewelry-condition');
-            
-            finalName = (nSel && nSel.value === 'Others') ? nCus.value : (nSel ? nSel.value : 'Jewelry Item');
-            finalCond = (cSel && cSel.value === 'Others') ? cCus.value : (cSel ? cSel.value : 'Good');
-
-            const karatEl = document.getElementById('karat');
-            const karatTxt = karatEl.options[karatEl.selectedIndex].text.split(' - ')[0];
-            document.getElementById('jewelry_karat_label').value = karatTxt;
-            const gross = parseFloat(document.getElementById('weight').value) || 0;
-            const ded = parseFloat(document.getElementById('stone_deduction').value) || 0;
-            const net = Math.max(0, gross - ded);
-            
-            finalDesc = `${karatTxt} ${finalName} | Gross: ${gross.toFixed(2)}g | Net: ${net.toFixed(2)}g (${ded.toFixed(2)}g Stone) | Cond: ${finalCond}`;
-            
-            const stoneBlock = document.getElementById('stone-assessment-block');
-            if (!stoneBlock.classList.contains('hidden')) {
-                const cut = document.getElementById('stone_cut').options[document.getElementById('stone_cut').selectedIndex].text;
-                const col = document.getElementById('stone_color').options[document.getElementById('stone_color').selectedIndex].text;
-                const cla = document.getElementById('stone_clarity').options[document.getElementById('stone_clarity').selectedIndex].text;
-                const car = document.getElementById('stone_carat').value || '0';
-                const pre = finalDesc ? ' || ' : '';
-                finalDesc += `${pre}Stone: ${car}ct, Cut: ${cut}, Color: ${col}, Clarity: ${cla}`;
+    function calculateDynamic() {
+        // 1. DATA BRIDGE: Compile Description for preview_ticket.php
+        const l2Node = document.getElementById('matrix_classification');
+        const l3Node = document.getElementById('matrix_brand');
+        const l4Node = document.getElementById('matrix_model');
+        
+        const classification = l2Node.options[l2Node.selectedIndex]?.text || '';
+        const brand = !l3Node.disabled && l3Node.selectedIndex > 0 ? l3Node.options[l3Node.selectedIndex].text : '';
+        const model = !l4Node.disabled && l4Node.selectedIndex > 0 ? l4Node.options[l4Node.selectedIndex].text : '';
+        
+        // Compile the string: e.g., "Cellphone - Apple iPhone 15 Pro Max"
+        const finalName = [classification, brand, model].filter(Boolean).join(' - ');
+        
+        // Check if L4 has a specific base appraisal value overriding L2
+        if (!l4Node.disabled && l4Node.selectedIndex > 0) {
+            const l4Base = l4Node.options[l4Node.selectedIndex].getAttribute('data-base');
+            if (l4Base && l4Base !== '' && document.activeElement !== document.getElementById('base_market_value')) {
+                document.getElementById('base_market_value').value = l4Base;
             }
-        } else {
-            const type = document.getElementById('elec-type').value;
-            const brand = document.getElementById('elec-brand').value;
-            const model = document.getElementById('elec-brand-model').value || 'Unknown Device';
-            const brandModel = brand === 'Other' ? model : `${brand} ${model}`;
-            
-            finalName = type === 'Other' ? model : type;
-            const serial = document.getElementById('elec-serial').value || 'SYS-SERIAL-N/A';
-            
-            // Gather accessories
-            let accs = [];
-            if (document.getElementById('elec-acc-box').checked) accs.push('Box');
-            if (document.getElementById('elec-acc-charger').checked) accs.push('Charger');
-            if (document.getElementById('elec-acc-receipt').checked) accs.push('Receipt');
-            const accList = accs.length > 0 ? ` | Incl: ${accs.join(', ')}` : '';
-
-            finalName = `${brandModel} (${type})`;
-            const condSel = document.getElementById('elec-condition');
-            finalCond = condSel.options[condSel.selectedIndex].text;
-            finalDesc = `${type} | ${brandModel} | Serial: ${serial}${accList}`;
         }
+        
+        let descArray = [];
+        document.querySelectorAll('.dynamic-spec').forEach(el => {
+            if (el.value) descArray.push(`${el.getAttribute('data-label')}: ${el.value}`);
+        });
+        
+        let failedTests = [];
+        document.querySelectorAll('.dynamic-test:checked').forEach(el => {
+            failedTests.push(el.getAttribute('data-test-name'));
+        });
+        if(failedTests.length > 0) descArray.push(`TEST LOGS: ${failedTests.join(', ')}`);
+
         document.getElementById('final_item_name').value = finalName;
-        document.getElementById('final_item_condition').value = finalCond;
-        document.getElementById('final_item_description').value = finalDesc;
-    }
+        document.getElementById('final_item_description').value = descArray.join(' | ');
 
-    function calculate() {
-        let appraisedVal = 0;
-        const fmt = (n) => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        // --- SMART SCANNER: Auto-Calculate Gold & Diamonds ---
+        let detectedKarat = null;
+        let detectedWeight = null;
+        let detectedDeduction = null;
+        let detectedDiamondCarat = null;
 
-        if (currentMode === 'jewelry') {
-            document.getElementById('elec-telemetry-breakdown').classList.add('hidden');
+        document.querySelectorAll('.dynamic-spec').forEach(el => {
+            const label = el.getAttribute('data-label').toLowerCase();
+            const val = el.value;
             
-            // Authenticity Kill-Switch Logic
-            const magnet = document.getElementById('auth-magnet')?.checked || false;
-            const acid = document.getElementById('auth-acid')?.checked || false;
-            const isFake = !magnet || !acid;
+            if (label.includes('karat') || label.includes('purity')) detectedKarat = val;
+            if (label.includes('weight') && !label.includes('deduction') && !label.includes('carat')) detectedWeight = parseFloat(val) || 0;
+            if (label.includes('deduction')) detectedDeduction = parseFloat(val) || 0;
+            if (label.includes('carat') && !label.includes('karat')) detectedDiamondCarat = parseFloat(val) || 0;
+        });
 
-            let goldVal = 0, stoneVal = 0;
+        // 1. Gold Auto-Math
+        if (detectedKarat && detectedWeight > 0) {
+            const netWeight = detectedWeight - (detectedDeduction || 0);
+            let rateKey = Object.keys(GLOBAL_SETTINGS.rates).find(k => detectedKarat.toUpperCase().includes(k));
+            let currentRate = rateKey ? GLOBAL_SETTINGS.rates[rateKey] : 0;
             
-            const grossWeight = parseFloat(document.getElementById('weight')?.value) || 0;
-            const deduction = parseFloat(document.getElementById('stone_deduction')?.value) || 0;
-            const netWeight = Math.max(0, grossWeight - deduction);
-            const karatRate = parseFloat(document.getElementById('karat')?.value) || 0;
-
-            if (isFake) {
-                appraisedVal = 0;
-                document.getElementById('display-appraised').innerHTML = '<span class="text-error text-[10px] sm:text-lg animate-pulse uppercase font-black">CRITICAL_LOCK: FAKE_ASSET_DETECTED</span>';
-            } else {
-                // Calculate Gold (Net Weight * Karat Rate)
-                goldVal = netWeight * karatRate;
-                
-                // Calculate Diamond (Carats * Rate per Carat)
-                if (!document.getElementById('stone-assessment-block').classList.contains('hidden')) {
-                    const carats = parseFloat(document.getElementById('stone_carat').value) || 0;
-                    const ratePerCarat = parseFloat(document.getElementById('stone_rate').value) || 0;
-                    const cutMult = parseFloat(document.getElementById('stone_cut').value) || 1.0;
-                    const colorMult = parseFloat(document.getElementById('stone_color').value) || 1.0;
-                    const clarityMult = parseFloat(document.getElementById('stone_clarity').value) || 1.0;
-                    stoneVal = (carats * ratePerCarat) * cutMult * colorMult * clarityMult;
-                }
-                
-                appraisedVal = goldVal + stoneVal;
-                document.getElementById('display-appraised').innerText = '₱' + fmt(appraisedVal);
+            if (currentRate > 0 && document.activeElement !== document.getElementById('base_market_value')) {
+                document.getElementById('base_market_value').value = (netWeight * currentRate).toFixed(2);
             }
-        } else {
-            const elecBrandEl = document.getElementById('elec-brand');
-            if(!elecBrandEl) return;
-            const brand = elecBrandEl.value;
-
-            const marketVal = parseFloat(document.getElementById('elec-market-val')?.value) || 0;
-            const tierMult = parseFloat(document.getElementById('elec-condition')?.value) || 1.0;
-            
-            // Base Appraised (Condition-Relative)
-            const baseMarket = marketVal * tierMult;
-            let accBonus = 0;
-
-            // Apply Accessory Boosters (Additive to base market)
-            const boxEl = document.getElementById('elec-acc-box');
-            const chargerEl = document.getElementById('elec-acc-charger');
-            if (boxEl && boxEl.checked) accBonus += (marketVal * 0.02);
-            if (chargerEl && chargerEl.checked) accBonus += (marketVal * 0.03);
-            
-            appraisedVal = baseMarket + accBonus;
-
-            // Security Hardening: Lockdown Logic
-            let isLocked = false;
-            if (brand === 'Apple') {
-                const cloudEl = document.getElementById('ios-cloud');
-                if (cloudEl && !cloudEl.checked) isLocked = true;
-            } else if (brand !== '' && brand !== 'Other') {
-                const googleEl = document.getElementById('android-google');
-                if (googleEl && !googleEl.checked) isLocked = true;
-            }
-
-            if (isLocked) {
-                appraisedVal = 0;
-            }
-
-            // Updated Telemetry Breakdown UI
-            const breakdownEl = document.getElementById('elec-telemetry-breakdown');
-            if (breakdownEl) breakdownEl.classList.toggle('hidden', isLocked || marketVal <= 0);
-            
-            const displayAppraised = document.getElementById('display-appraised');
-            if (isLocked) {
-                displayAppraised.innerHTML = '<span class="text-error text-[10px] sm:text-lg animate-pulse uppercase font-black">CRITICAL_SECURITY_LOCK: VALUE_ZERO</span>';
-            } else {
-                displayAppraised.innerText = '₱' + fmt(appraisedVal);
-            }
-            
-            document.getElementById('display-base-market').innerText = '₱' + fmt(baseMarket);
-            document.getElementById('display-acc-bonus').innerText = '+ ₱' + fmt(accBonus);
         }
 
-        const ltv = <?= ($sys_settings['ltv_percentage'] ?? 40) / 100 ?>;
-        const principal = appraisedVal * ltv;
+        // 2. Diamond Auto-Math
+        if (detectedDiamondCarat > 0 && !detectedKarat) {
+            if (GLOBAL_SETTINGS.diamond_base > 0 && document.activeElement !== document.getElementById('base_market_value')) {
+                document.getElementById('base_market_value').value = (detectedDiamondCarat * GLOBAL_SETTINGS.diamond_base).toFixed(2);
+            }
+        }
+        // --- END SMART SCANNER ---
+
+        // 2. FINANCIAL TELEMETRY: Calculate Dynamic Value
+        let baseVal = parseFloat(document.getElementById('base_market_value').value) || 0;
+        let finalVal = baseVal;
+        let isDead = false;
+
+        document.querySelectorAll('.dynamic-test:checked').forEach(test => {
+            let type = test.getAttribute('data-impact-type');
+            let val = parseFloat(test.getAttribute('data-impact-value')) || 0;
+            
+            if (type === 'penalty' && val >= 100) {
+                isDead = true; // Kill-Switch Triggered
+            } else if (type === 'penalty') {
+                finalVal -= (baseVal * (val / 100));
+            } else if (type === 'bonus') {
+                finalVal += (baseVal * (val / 100));
+            }
+        });
+
+        if (isDead || finalVal < 0) finalVal = 0;
+
+        // 3. UI UPDATES
+        const fmt = (n) => n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const displayAppraised = document.getElementById('display-appraised');
+        
+        if (isDead) {
+            displayAppraised.innerHTML = '<span class="text-error text-[10px] sm:text-lg animate-pulse uppercase font-black">SECURITY_LOCK: VALUE_ZERO</span>';
+        } else {
+            displayAppraised.innerText = '₱' + fmt(finalVal);
+        }
+
+        const principal = finalVal * GLOBAL_SETTINGS.ltv;
         const interest = principal * (GLOBAL_SETTINGS.interest_rate / 100);
         const net = principal - interest - GLOBAL_SETTINGS.service_charge;
         const finalNet = net > 0 ? net : 0;
-        document.getElementById('display-appraised').innerText = '₱' + fmt(appraisedVal);
+
         document.getElementById('display-principal').innerText = '₱' + fmt(principal);
         document.getElementById('display-interest').innerText = '- ₱' + fmt(interest);
         document.getElementById('display-net').innerText = fmt(finalNet);
@@ -749,58 +698,23 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         document.getElementById('input-net').value = finalNet.toFixed(2);
     }
 
-    function clearItemFields() {
-        // 1. Jewelry Reset Logic
-        const jewelrySections = ['#jewelry-fields'];
-        jewelrySections.forEach(selector => {
-            const container = document.querySelector(selector);
-            if (!container) return;
-            const fields = container.querySelectorAll('input[type="text"], input[type="number"], textarea');
-            fields.forEach(f => f.value = '');
-            const selects = container.querySelectorAll('select');
-            selects.forEach(s => s.selectedIndex = 0);
-        });
-
-        // 2. Electronics Reset Overhaul
-        const brandEl = document.getElementById('elec-brand');
-        if (brandEl) brandEl.selectedIndex = 0;
+    function resetSpawner() {
+        document.getElementById('asset_category').selectedIndex = 0;
+        document.getElementById('matrix_classification').innerHTML = '<option value="" disabled selected>-- PENDING --</option>';
+        document.getElementById('matrix_classification').disabled = true;
+        document.getElementById('matrix_brand').innerHTML = '<option value="" disabled selected>-- PENDING --</option>';
+        document.getElementById('matrix_brand').disabled = true;
+        document.getElementById('matrix_model').innerHTML = '<option value="" disabled selected>-- PENDING --</option>';
+        document.getElementById('matrix_model').disabled = true;
         
-        const iosBlock = document.getElementById('audit-ios');
-        const androidBlock = document.getElementById('audit-android');
-        if (iosBlock) iosBlock.classList.add('hidden');
-        if (androidBlock) androidBlock.classList.add('hidden');
-
-        const elecContainer = document.getElementById('electronics-fields');
-        const jewelryContainer = document.getElementById('jewelry-fields');
+        document.getElementById('base_market_value').value = '';
+        document.getElementById('dynamic-specs-container').innerHTML = '<div class="col-span-full text-[10px] font-headline text-on-surface-variant/50 uppercase tracking-widest italic py-4">-- Awaiting Classification --</div>';
+        document.getElementById('dynamic-tests-container').innerHTML = '<div class="col-span-full text-[10px] font-headline text-on-surface-variant/50 uppercase tracking-widest italic py-4">-- Awaiting Classification --</div>';
         
-        [elecContainer, jewelryContainer].forEach(container => {
-            if (!container) return;
-            // Uncheck ALL audit and accessory checkboxes
-            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(cb => cb.checked = false);
-
-            // Clear all text and numeric inputs
-            const textInputs = container.querySelectorAll('input[type="text"], input[type="number"]');
-            textInputs.forEach(ti => {
-                if (ti.id === 'stone_deduction') ti.value = '0';
-                else ti.value = '';
-            });
-        });
-        
-        // 3. Global UI Reset
-        document.getElementById('custom-jewelry-desc')?.classList.add('hidden');
-        document.getElementById('custom-jewelry-condition')?.classList.add('hidden');
-        document.getElementById('stone-assessment-block')?.classList.add('hidden');
-        document.getElementById('gold-assessment-block')?.classList.remove('hidden');
-
-        // 4. Telemetry Synchronization
-        calculate();
+        calculateDynamic();
     }
 
-    ['karat', 'weight', 'stone_carat', 'stone_rate', 'elec-market-val', 'elec-condition', 'elec-brand-model'].forEach(id => {
-        const el = document.getElementById(id);
-        if(el) el.addEventListener('input', calculate);
-    });
+    // Ensure TomSelect handles the new customer logic and runs initial calculation
     window.addEventListener('load', () => {
         if (document.getElementById('customer_select')) {
             const settings = {
@@ -809,7 +723,6 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
                 placeholder: "-- SEARCH VERIFIED CLIENT DATABASE --",
                 allowEmptyOption: true,
                 onChange: function(value) {
-                    // This ensures your existing auto-fill logic still works
                     if (typeof updateCustomerInfo === "function") {
                         updateCustomerInfo();
                     }
@@ -818,26 +731,10 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
             new TomSelect("#customer_select", settings);
         }
 
-        // 1. Restore Customer Context
         if (document.getElementById('customer_select').value) {
             updateCustomerInfo();
         }
-
-        // 2. Restore Item Modality (Jewelry vs Electronics)
-        const draftMode = "<?= $draft['item_type'] ?? 'jewelry' ?>";
-        setMode(draftMode);
-
-        // 3. Restore Classification Visuals (Crucial for Draft Retention)
-        const jewelryDesc = document.getElementById('jewelry-desc-select');
-        const jewelryCond = document.getElementById('jewelry-condition');
-        const elecBrand = document.getElementById('elec-brand');
-
-        if (jewelryDesc) handleJewelrySelection(jewelryDesc);
-        if (jewelryCond) toggleCustomInput(jewelryCond, 'custom-jewelry-condition');
-        if (elecBrand) handleBrandChange();
-
-        // 4. Final Telemetry Recalculation
-        calculate();
+        calculateDynamic();
     });
 </script><link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>

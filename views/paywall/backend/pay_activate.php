@@ -1,0 +1,53 @@
+<?php
+session_start();
+header('Content-Type: application/json');
+
+if (!isset($_SESSION['user_id'])) {
+    echo json_encode(['success' => false, 'message' => 'Session expired.']);
+    exit;
+}
+
+$user_id = $_SESSION['user_id']; // This is the 'id' from your public.profiles
+
+$paymongo_secret = getenv('PAYMONGO_SECRET_KEY') ?: 'sk_test_your_key_here';
+
+$payload = json_encode([
+    'data' => [
+        'attributes' => [
+            'description' => "Node Activation for User: " . $user_id,
+            'line_items' => [[
+                'currency' => 'PHP',
+                'amount'   => 499900, 
+                'name'     => 'Pawnereno Node Activation',
+                'quantity' => 1
+            ]],
+            'payment_method_types' => ['gcash', 'paymaya', 'card'],
+            'success_url' => 'https://pawnereno.onrender.com/paywall/paywall_view.php?status=success',
+            'cancel_url'  => 'https://pawnereno.onrender.com/paywall/paywall_view.php?status=cancelled',
+            'metadata' => [
+                'user_id' => $user_id // Passing the exact 'id' from your profiles table
+            ]
+        ]
+    ]
+]);
+
+$ch = curl_init('https://api.paymongo.com/v1/checkout_sessions');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Authorization: Basic ' . base64_encode($paymongo_secret)
+]);
+
+$response = curl_exec($ch);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+$result = json_decode($response, true);
+
+if ($http_code === 200 && isset($result['data']['attributes']['checkout_url'])) {
+    echo json_encode(['success' => true, 'checkout_url' => $result['data']['attributes']['checkout_url']]);
+} else {
+    echo json_encode(['success' => false, 'message' => 'Gateway Error.']);
+}

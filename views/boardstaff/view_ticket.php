@@ -205,10 +205,16 @@ include 'includes/header.php';
                                     <span class="material-symbols-outlined text-[18px] group-hover:rotate-12 transition-transform">print</span>
                                     Generate Official Ticket
                                 </button>
-                                <a href="payments.php?id=<?= $loan['loan_id'] ?>" class="flex items-center gap-3 px-8 py-4 bg-tertiary-dim text-black font-headline font-bold uppercase text-[11px] tracking-widest hover:opacity-90 transition-all rounded-sm shadow-xl italic">
-                                    <span class="material-symbols-outlined text-[18px]">payments</span>
-                                    Settle Transaction
-                                </a>
+                                <?php if ($loan['status'] === 'active'): ?>
+                                    <a href="payments.php?id=<?= $loan['loan_id'] ?>" class="flex items-center gap-3 px-8 py-4 bg-tertiary-dim text-black font-headline font-bold uppercase text-[11px] tracking-widest hover:opacity-90 transition-all rounded-sm shadow-xl italic">
+                                        <span class="material-symbols-outlined text-[18px]">payments</span>
+                                        Settle Transaction
+                                    </a>
+                                <?php else: ?>
+                                    <div class="px-6 py-4 border border-outline-variant/10 bg-surface-container-highest/50 text-on-surface-variant font-headline font-bold uppercase text-[10px] tracking-widest rounded-sm italic">
+                                        Ledger Closed (<?= strtoupper($loan['status']) ?>)
+                                    </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>

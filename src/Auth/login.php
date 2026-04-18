@@ -96,12 +96,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // THE SAFETY NET: Wrapped the interior of the loop in a try/catch
             try {
                 // Safely query the employees table in the current schema
-                $query = "SELECT * FROM \"$schema\".employees WHERE email = :email AND status = 'active' LIMIT 1";
+                $query = "SELECT * FROM \"$schema\".employees WHERE email = :email LIMIT 1";
                 $stmt_emp = $pdo->prepare($query);
                 $stmt_emp->execute(['email' => $email]);
                 $employee = $stmt_emp->fetch(PDO::FETCH_ASSOC);
 
                 if ($employee && password_verify($password, $employee['password_hash'])) {
+                    
+                    // 1. Check for Soft Deletion (Purged)
+                    if ($employee['deleted_at'] !== null) {
+                        header("Location: ../../views/auth/login.php?error=" . urlencode("ACCESS DENIED: Operator account has been permanently purged."));
+                        exit;
+                    }
+
+                    // 2. Check for Deactivation (Suspended)
+                    if ($employee['status'] !== 'active') {
+                        header("Location: ../../views/auth/login.php?error=" . urlencode("ACCESS DENIED: Operator clearance is currently suspended."));
+                        exit;
+                    }
+
                     // STAFF SUCCESSFUL
                     $_SESSION['employee_id'] = $employee['employee_id'];
                     $_SESSION['user_id'] = $employee['employee_id']; // Consistency with auth checks

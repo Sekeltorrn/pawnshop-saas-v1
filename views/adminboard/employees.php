@@ -36,6 +36,31 @@ try {
     $successMsg = '';
     $errorMsg = '';
 
+    // HANDLE ACTIONS (Deactivate/Delete)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && isset($_POST['target_id'])) {
+        $target_id = $_POST['target_id'];
+        $action = $_POST['action'];
+
+        // Prevent admin from deleting themselves
+        if ($target_id !== $_SESSION['user_id']) { // Assuming user_id is the logged in employee_id
+            if ($action === 'toggle_status') {
+                $stmt = $pdo->prepare("UPDATE \"$tenant_schema\".employees SET status = CASE WHEN status = 'active' THEN 'inactive' ELSE 'active' END WHERE employee_id = ?");
+                $stmt->execute([$target_id]);
+                $successMsg = "Operator clearance toggled successfully.";
+            } elseif ($action === 'delete') {
+                $stmt = $pdo->prepare("UPDATE \"$tenant_schema\".employees SET deleted_at = NOW(), status = 'deleted' WHERE employee_id = ?");
+                $stmt->execute([$target_id]);
+                $successMsg = "Operator permanently purged from node.";
+            }
+        } else {
+            $errorMsg = "Security Protocol: You cannot alter your own clearance level.";
+        }
+        
+        // Refresh the operators list after action (Optional but good for clean POST)
+        // If you want to see the successMsg, you might skip the redirect or use session
+        // Let's rely on the direct page reload for now.
+    }
+
     // 4. FETCH LIVE OPERATORS FOR TABLE
     $operators = [];
     $stmtOps = $pdo->prepare("
@@ -160,15 +185,37 @@ require_once 'includes/header.php';
                         </td>
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-1.5">
-                                <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#00ff41] shadow-[0_0_5px_#00ff41]"></span>
-                                <span class="text-[9px] font-black uppercase text-slate-300 tracking-widest"><?= htmlspecialchars($op['status']) ?></span>
+                                <?php if ($op['status'] === 'active'): ?>
+                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#00ff41] shadow-[0_0_5px_#00ff41]"></span>
+                                    <span class="text-[9px] font-black uppercase text-slate-300 tracking-widest">ACTIVE</span>
+                                <?php else: ?>
+                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-[#ff6b00] shadow-[0_0_5px_#ff6b00]"></span>
+                                    <span class="text-[9px] font-black uppercase text-[#ff6b00] tracking-widest">INACTIVE</span>
+                                <?php endif; ?>
                             </div>
                         </td>
                         <td class="px-4 py-3">
                             <p class="text-[10px] font-mono text-slate-500"><?= date('M d, Y', strtotime($op['created_at'])) ?></p>
                         </td>
                         <td class="px-4 py-3 text-right">
-                            <button class="text-slate-500 hover:text-white transition-colors"><span class="material-symbols-outlined text-sm">settings</span></button>
+                            <?php if (!$isOwner): // Hide actions for the primary admin ?>
+                            <div class="flex items-center justify-end gap-2">
+                                <form method="POST" class="inline">
+                                    <input type="hidden" name="target_id" value="<?= $op['employee_id'] ?>">
+                                    <input type="hidden" name="action" value="toggle_status">
+                                    <button type="submit" class="p-1.5 bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 rounded-sm transition-all" title="<?= $op['status'] === 'active' ? 'Revoke Access' : 'Restore Access' ?>">
+                                        <span class="material-symbols-outlined text-sm"><?= $op['status'] === 'active' ? 'lock' : 'lock_open' ?></span>
+                                    </button>
+                                </form>
+                                <form method="POST" class="inline" onsubmit="return confirm('CRITICAL WARNING: This will permanently purge this operator. Proceed?');">
+                                    <input type="hidden" name="target_id" value="<?= $op['employee_id'] ?>">
+                                    <input type="hidden" name="action" value="delete">
+                                    <button type="submit" class="p-1.5 bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-black rounded-sm transition-all" title="Purge Operator">
+                                        <span class="material-symbols-outlined text-sm">delete_forever</span>
+                                    </button>
+                                </form>
+                            </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>

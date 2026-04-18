@@ -30,6 +30,49 @@ update on categories for EACH row
 execute FUNCTION update_updated_at_column ();
 
 
+create table asset_matrix (
+    node_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category_id UUID NOT NULL, -- Links to your 'categories' table
+    parent_id UUID NULL,       -- Self-reference for hierarchy
+    name VARCHAR(100) NOT NULL,
+    hierarchy_level VARCHAR(50) NOT NULL, -- 'L2_Classification', 'L3_Brand', etc.
+    is_accepted BOOLEAN DEFAULT TRUE,
+    base_appraisal_value NUMERIC(15, 2) NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    
+    CONSTRAINT fk_asset_parent FOREIGN KEY (parent_id) REFERENCES asset_matrix (node_id) ON DELETE CASCADE,
+    CONSTRAINT fk_matrix_category FOREIGN KEY (category_id) REFERENCES categories (category_id) ON DELETE CASCADE,
+    CONSTRAINT unique_name_per_parent UNIQUE (category_id, parent_id, name, hierarchy_level)
+);
+
+
+create table asset_attributes (
+    attribute_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    node_id UUID NOT NULL, -- Links to L2 (Classification)
+    label VARCHAR(100) NOT NULL,
+    field_type VARCHAR(20) NOT NULL, -- 'select', 'text', 'number'
+    options JSONB NULL,              -- e.g., ["128GB", "256GB"]
+    is_required BOOLEAN DEFAULT TRUE,
+    
+    CONSTRAINT fk_attr_node FOREIGN KEY (node_id) REFERENCES asset_matrix (node_id) ON DELETE CASCADE
+);
+
+
+create table asset_tests (
+    test_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    node_id UUID NOT NULL, -- Specifically links to the L2_Classification (e.g., 'Smartphone')
+    test_name VARCHAR(100) NOT NULL, -- e.g., 'Screen Crack Check'
+    test_group VARCHAR(50) NOT NULL, -- e.g., 'Display & Touch'
+    impact_type VARCHAR(20) DEFAULT 'penalty', -- 'penalty' (minus $) or 'bonus' (plus $)
+    impact_value NUMERIC(5, 2) NULL, -- e.g., 10.00 (represents a 10% deduction)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()),
+    
+    -- Ensures the tests are wiped if the classification is deleted
+    CONSTRAINT fk_test_node FOREIGN KEY (node_id) 
+        REFERENCES asset_matrix (node_id) ON DELETE CASCADE
+);
+
+
 create table customers (
   customer_id uuid not null default gen_random_uuid (),
   auth_user_id uuid null,

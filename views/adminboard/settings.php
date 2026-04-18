@@ -191,6 +191,10 @@ include 'includes/header.php';
                             <span class="material-symbols-outlined text-lg">door_sliding</span>
                             <span class="text-[10px] font-black uppercase tracking-widest">Vaults</span>
                         </button>
+                        <a href="asset_matrix.php" class="w-full flex items-center gap-3 px-4 py-3 bg-[#0a0b0d] border border-white/5 text-[#00c3ff] hover:bg-[#141518] hover:border-[#00c3ff]/50 text-left transition-all rounded-sm">
+                            <span class="material-symbols-outlined text-lg">category</span>
+                            <span class="text-[10px] font-black uppercase tracking-widest">Asset Matrix</span>
+                        </a>
                     </div>
 
                     <div class="lg:col-span-9 space-y-6">
@@ -345,6 +349,8 @@ include 'includes/header.php';
                             </div>
                         </div>
                         </div>
+
+
 
                         <button type="submit" id="sync-btn" name="update_settings" value="1" disabled class="w-full bg-[#00ff41] mt-8 hover:bg-[#00cc33] text-black font-black py-4 uppercase tracking-[0.2em] text-[11px] shadow-[0_0_20px_rgba(0,255,65,0.2)] hover:shadow-[0_0_30px_rgba(0,255,65,0.4)] transition-all flex items-center justify-center gap-2 opacity-50 cursor-not-allowed disabled:hover:bg-[#00ff41] disabled:hover:shadow-[0_0_20px_rgba(0,255,65,0.2)]">
                             <span class="material-symbols-outlined text-sm">save</span> Synchronize System Parameters

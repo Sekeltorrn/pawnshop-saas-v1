@@ -216,7 +216,7 @@ try {
     $stmt_shift_check->execute([$current_user_id]);
     $global_active_shift = $stmt_shift_check->fetchColumn();
 
-    $stmt = $pdo->prepare("SELECT l.pawn_ticket_no, l.reference_no, l.due_date, c.first_name, c.last_name FROM loans l JOIN customers c ON l.customer_id = c.customer_id WHERE l.status NOT IN ('redeemed', 'expired') ORDER BY l.due_date ASC LIMIT 50");
+    $stmt = $pdo->prepare("SELECT l.pawn_ticket_no, l.reference_no, l.due_date, c.first_name, c.last_name FROM loans l JOIN customers c ON l.customer_id = c.customer_id WHERE l.status = 'active' ORDER BY l.due_date ASC LIMIT 50");
     $stmt->execute();
     $active_loans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {}
@@ -377,7 +377,7 @@ include 'includes/header.php';
                             </div>
                             <div class="bg-surface-container-highest p-6 border border-outline-variant/10 flex flex-col md:flex-row items-center gap-6 focus-within:border-primary transition-all rounded-sm">
                                 <div class="flex-1 w-full"><p class="text-on-surface-variant text-[10px] uppercase font-headline font-black tracking-[0.3em] opacity-50 mb-3">Tendered_Input (CASH_ONLY)</p>
-                                    <div class="flex items-center gap-4 text-on-surface-variant/20"><span class="text-3xl font-headline">₱</span><input type="number" id="tendered_input" name="amount_tendered" step="0.01" autofocus class="w-full bg-transparent text-4xl md:text-5xl font-headline font-bold text-on-surface tracking-tighter outline-none" value="<?= $accrued['total'] ?>"></div>
+                                    <div class="flex items-center gap-4 text-on-surface-variant/20"><span class="text-3xl font-headline">₱</span><input type="number" id="tendered_input" name="amount_tendered" step="any" autofocus class="w-full bg-transparent text-4xl md:text-5xl font-headline font-bold text-on-surface tracking-tighter outline-none" value="<?= number_format((float)$accrued['total'], 2, '.', '') ?>"></div>
                                 </div>
                                 <div class="w-full md:w-64 opacity-60 focus-within:opacity-100 transition-opacity"><p class="text-[10px] font-headline font-bold text-on-surface-variant uppercase tracking-[0.3em] mb-2 opacity-50 italic">Physical OR Booklet No. (Optional)</p>
                                     <input type="text" name="or_number" placeholder="Leave blank if digital" class="w-full bg-surface-container-lowest border border-outline-variant/10 p-3 text-on-surface font-mono font-bold text-lg outline-none tracking-widest uppercase focus:border-primary placeholder:text-[10px]">

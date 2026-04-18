@@ -49,6 +49,7 @@ if ($loan_id) {
             $first_name = $loan_data['first_name'];
             $last_name = $loan_data['last_name'];
             $pawner_address = $loan_data['address'] ?? 'Verified Primary Residence';
+            $item_name = $loan_data['item_name'] ?? 'Asset';
             $item_description = $loan_data['item_description'];
             $principal = floatval($loan_data['principal_amount']);
             $interest_rate = floatval($loan_data['interest_rate']);
@@ -85,6 +86,7 @@ if ($loan_id) {
         } catch (PDOException $e) {}
     }
 
+    $item_name = $_POST['item_name'] ?? 'Unclassified Asset';
     $item_description = $_POST['item_description'] ?? 'No metadata provided.';
     $principal = floatval($_POST['principal_amount'] ?? 0);
     $interest_rate = floatval($_POST['system_interest_rate'] ?? 3.5);
@@ -270,65 +272,18 @@ include 'includes/header.php';
                         <p class="text-[9px] font-bold italic text-center opacity-70 mt-2">Penalty Interest, if any: 5% Monthly after Maturity</p>
                     </div>
                 </div>
-            </div>
-
-            <!-- DESCRIPTION BOX -->
+                  <!-- DESCRIPTION BOX -->
             <div class="border-t-2 border-black p-4">
                 <p class="text-[9px] font-bold uppercase mb-2">Description of the Pawn (Item Metadata):</p>
-                <div class="p-4 bg-white border border-black min-h-[80px] print-contrast">
-                    <?php 
-                        $type = $_POST['item_type'] ?? ($loan_data['category_id'] ? 'jewelry' : 'electronics'); 
-                        
-                        if ($type === 'jewelry' || isset($_POST['weight']) || !empty($loan_data['weight_grams'])): 
-                            // Classification Display Logic
-                            $display_class = $_POST['primary_classification'] ?? ($loan_data['item_name'] ?? 'Jewelry Asset');
-                            if ($display_class === 'Others' && !empty($_POST['other_classification'])) {
-                                $display_class = $_POST['other_classification'];
-                            }
-                            
-                            $gross = $_POST['weight'] ?? $loan_data['weight_grams'] ?? 0;
-                            $deduction = $_POST['stone_deduction'] ?? 0;
-                            $net = floatval($gross) - floatval($deduction);
-                    ?>
-                        <div class="space-y-1">
-                            <p class="text-[13px] font-bold uppercase"><?= htmlspecialchars($display_class) ?></p>
-                            <div class="grid grid-cols-2 gap-x-8 text-[11px] font-medium">
-                                <p>Karat: <span class="font-bold underline"><?= htmlspecialchars($_POST['jewelry_karat_label'] ?? 'Standard') ?></span></p>
-                                <p>Gross Weight: <span class="font-bold"><?= number_format(floatval($gross), 2) ?> g</span></p>
-                                <p>Stone Deduction: <span class="font-bold"><?= number_format(floatval($deduction), 2) ?> g</span></p>
-                                <p>Net Weight: <span class="font-bold underline"><?= number_format($net, 2) ?> g</span></p>
-                            </div>
-                            <?php if (!empty($_POST['stone_carat']) && $_POST['stone_carat'] > 0): ?>
-                                <p class="text-[10px] mt-2 italic opacity-80">Stone Details: <?= htmlspecialchars($_POST['stone_carat']) ?>ct (<?= htmlspecialchars($_POST['stone_cut'] ?? '') ?>/<?= htmlspecialchars($_POST['stone_color'] ?? '') ?>/<?= htmlspecialchars($_POST['stone_clarity'] ?? '') ?>)</p>
-                            <?php endif; ?>
-                            <p class="text-[9px] mt-2 opacity-60">Condition: <?= htmlspecialchars($_POST['item_condition_text'] ?? $loan_data['item_condition'] ?? 'Good') ?></p>
-                        </div>
-                    <?php elseif ($type === 'electronics' || isset($_POST['electronics_serial']) || !empty($loan_data['serial_number'])): 
-                        $brand = $_POST['elec_brand'] ?? '';
-                        $model = $_POST['elec_model'] ?? '';
-                        $serial = $_POST['electronics_serial'] ?? $loan_data['serial_number'] ?? 'N/A';
-                        $display_class = $_POST['primary_classification_elec'] ?? ($loan_data['item_name'] ?? 'Electronic Asset');
-                        if ($display_class === 'Other') {
-                             $display_class = $model; // Fallback to model for electronics if category is "Other"
-                        }
-                    ?>
-                        <div class="space-y-1">
-                            <p class="text-[13px] font-bold uppercase"><?= htmlspecialchars($display_class) ?> | <?= htmlspecialchars($brand . ' ' . $model) ?></p>
-                            <div class="grid grid-cols-2 gap-x-8 text-[11px] font-medium">
-                                <p>Classification: <span class="font-bold"><?= htmlspecialchars($_POST['elec_type'] ?? 'Device') ?></span></p>
-                                <p>Serial / IMEI: <span class="font-bold underline"><?= htmlspecialchars($serial) ?></span></p>
-                                <p>Condition ID: <span class="font-bold"><?= htmlspecialchars($_POST['item_condition_text'] ?? $loan_data['item_condition'] ?? 'Good') ?></span></p>
-                                <?php if (isset($_POST['storage'])): ?>
-                                    <p>Storage: <span class="font-bold"><?= htmlspecialchars($_POST['storage']) ?> GB</span></p>
-                                <?php endif; ?>
-                            </div>
-                            <p class="text-[9px] mt-2 italic opacity-70">"<?= htmlspecialchars($item_description) ?>"</p>
-                        </div>
-                    <?php else: ?>
-                        <p class="font-bold italic"><?= htmlspecialchars($item_description) ?></p>
-                    <?php endif; ?>
+                <div class="p-4 bg-white border border-black min-h-[80px] print-contrast flex flex-col justify-center">
+                    <p class="text-[13px] font-black uppercase tracking-widest border-b border-black/10 pb-2 mb-2">
+                        <?= htmlspecialchars($item_name) ?>
+                    </p>
+                    <p class="text-[11px] font-medium leading-relaxed opacity-90 uppercase">
+                        <?= htmlspecialchars($item_description) ?>
+                    </p>
                 </div>
-            </div>
+            </div>          </div>
 
             <!-- SIGNATURES -->
             <div class="border-t-2 border-black p-4 bg-gray-50">
