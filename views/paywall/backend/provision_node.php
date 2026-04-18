@@ -2,6 +2,7 @@
 session_start();
 // Adjust path to your db_connect.php if your folder structure differs
 require_once __DIR__ . '/../../../config/db_connect.php';
+$pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, true);
 
 // 1. Security: Boot them out if they aren't logged in
 if (!isset($_SESSION['user_id'])) {
@@ -36,8 +37,8 @@ try {
     // 2. Point all future queries to this new schema
     $pdo->exec("SET search_path TO \"$schemaName\"");
 
-    // 3. Read the master schema blueprint (Pointing to your sandbox test file)
-    $schemaFilePath = __DIR__ . '/../../../test_schema_mini.sql'; 
+    // 3. Read the master schema blueprint (Pointing to your finalized blueprint)
+    $schemaFilePath = __DIR__ . '/../../../clone_schema.sql'; 
     if (!file_exists($schemaFilePath)) {
         throw new Exception("Master schema blueprint not found at: " . $schemaFilePath);
     }
