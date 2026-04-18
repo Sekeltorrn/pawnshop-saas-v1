@@ -1,6 +1,7 @@
 <?php
 session_start();
-header('Content-Type: application/json');
+// This script now handles direct browser redirection
+// header('Content-Type: application/json');
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Session expired.']);
@@ -47,7 +48,11 @@ curl_close($ch);
 $result = json_decode($response, true);
 
 if ($http_code === 200 && isset($result['data']['attributes']['checkout_url'])) {
-    echo json_encode(['success' => true, 'checkout_url' => $result['data']['attributes']['checkout_url']]);
+    // Instead of printing text, we force the browser to go to the PayMongo link
+    header("Location: " . $result['data']['attributes']['checkout_url']);
+    exit;
 } else {
-    echo json_encode(['success' => false, 'message' => 'Gateway Error.']);
+    // If it fails, send the user back to the subscription page with an error code
+    header("Location: ../paywall_view.php?tab=subscription&error=gateway_fail");
+    exit;
 }
