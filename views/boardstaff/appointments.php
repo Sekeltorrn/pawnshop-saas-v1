@@ -40,11 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $success_msg = "Appointment confirmed successfully.";
         } elseif ($action === 'cancel') {
             // Set status to cancelled with optional notes
-            $stmt = $pdo->prepare("UPDATE appointments SET status = 'cancelled', admin_notes = ?, updated_at = NOW() WHERE appointment_id = ?");
+            $stmt = $pdo->prepare("UPDATE appointments SET status = 'cancelled', remarks = ?, updated_at = NOW() WHERE appointment_id = ?");
             $stmt->execute([$admin_notes, $appointment_id]);
             
             // AUDIT LOG: Appointment Cancelled
-            record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'appointments', $appointment_id, ['status' => 'pending'], ['status' => 'cancelled', 'admin_notes' => $admin_notes]);
+            record_audit_log($pdo, $schemaName, $current_user_id, 'UPDATE', 'appointments', $appointment_id, ['status' => 'pending'], ['status' => 'cancelled', 'remarks' => $admin_notes]);
             
             $success_msg = "Appointment has been cancelled.";
         } elseif ($action === 'complete') {
@@ -225,24 +225,10 @@ include 'includes/header.php';
                             <?php if (strtolower($app['purpose']) === 'consultation'): ?>
                                 <div class="bg-black/20 p-5 rounded-sm border border-outline-variant/5 space-y-4">
                                     <div class="flex items-start gap-4">
-                                        <?php if ($app['item_image_url']): ?>
-                                            <div class="relative shrink-0 group/img">
-                                                <img src="<?= htmlspecialchars($app['item_image_url']) ?>" 
-                                                     class="w-20 h-20 object-cover rounded-sm border border-outline-variant/20 cursor-zoom-in hover:brightness-110 transition-all"
-                                                     onclick="openImageModal('<?= htmlspecialchars($app['item_image_url']) ?>')">
-                                                <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 pointer-events-none bg-black/40 transition-opacity">
-                                                    <span class="material-symbols-outlined text-white text-sm">fullscreen</span>
-                                                </div>
-                                            </div>
-                                        <?php else: ?>
-                                            <div class="w-20 h-20 bg-surface-container-high shrink-0 rounded-sm flex items-center justify-center border border-outline-variant/10">
-                                                <span class="material-symbols-outlined text-on-surface-variant/20">image_not_supported</span>
-                                            </div>
-                                        <?php endif; ?>
                                         <div class="flex-1 min-w-0">
                                             <p class="text-[8px] font-black text-on-surface-variant/40 uppercase tracking-widest mb-1 italic">Asset_Description</p>
                                             <p class="text-[11px] leading-relaxed text-on-surface-variant font-medium italic line-clamp-4">
-                                                "<?= htmlspecialchars($app['item_description'] ?: 'No technical brief provided by customer.') ?>"
+                                                "<?= htmlspecialchars($app['remarks'] ?: 'No technical brief provided by customer.') ?>"
                                             </p>
                                         </div>
                                     </div>
@@ -320,9 +306,9 @@ include 'includes/header.php';
                                         <span class="text-[9px] font-black uppercase tracking-[0.2em] <?= $h['status'] === 'completed' ? 'text-primary' : 'text-error' ?> italic bg-black/20 px-3 py-1 rounded-sm border <?= $h['status'] === 'completed' ? 'border-primary/20' : 'border-error/20' ?>">
                                             <?= strtoupper($h['status']) ?>
                                         </span>
-                                        <?php if ($h['admin_notes']): ?>
-                                            <p class="text-[8px] text-on-surface-variant/40 mt-2 italic truncate max-w-[200px]" title="<?= htmlspecialchars($h['admin_notes']) ?>">
-                                                Note: <?= htmlspecialchars($h['admin_notes']) ?>
+                                        <?php if (!empty($h['remarks'])): ?>
+                                            <p class="text-[8px] text-on-surface-variant/40 mt-2 italic truncate max-w-[200px]" title="<?= htmlspecialchars($h['remarks']) ?>">
+                                                Note: <?= htmlspecialchars($h['remarks']) ?>
                                             </p>
                                         <?php endif; ?>
                                     </div>
