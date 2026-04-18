@@ -35,8 +35,8 @@ if ($attrs && $is_paid) {
 
     if (!empty($user_id)) {
         try {
-            // TARGETING: Using your 'id' primary key and updating 'payment_status'
-            $stmt = $pdo->prepare("UPDATE public.profiles SET payment_status = 'paid', updated_at = NOW() WHERE id = ?");
+            // TARGETING: Using your 'id' primary key and updating 'payment_status' to 'active'
+            $stmt = $pdo->prepare("UPDATE public.profiles SET payment_status = 'active', updated_at = NOW() WHERE id = ?");
             $stmt->execute([$user_id]);
             
             http_response_code(200);
