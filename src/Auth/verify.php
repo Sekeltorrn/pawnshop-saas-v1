@@ -45,8 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Clean up the temporary email variable
             unset($_SESSION['temp_email']);
 
-            // Send them directly to the new Paywall Compliance Vault!
-            header("Location: ../../views/paywall/paywall_view.php");
+            // SEQUENCE FIX: Route to Business Setup before hitting the Paywall
+            header("Location: setup_business.php");
             exit;
 
         } else {

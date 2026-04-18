@@ -96,6 +96,10 @@ if (isset($_GET['inspect'])) {
             <span class="material-symbols-outlined text-sm" data-icon="refresh">refresh</span>
             SYNC_QUEUE
         </button>
+        <button onclick="purgeGhosts()" class="bg-error/10 border border-error/50 text-error px-4 py-2 font-label text-xs uppercase tracking-widest hover:bg-error hover:text-white transition-all flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">delete_sweep</span>
+            PURGE_GHOST_NODES
+        </button>
     </div>
 </div>
 
@@ -536,5 +540,25 @@ if (isset($_GET['inspect'])) {
     });
 </script>
 <?php endif; ?>
+
+<script>
+function purgeGhosts() {
+    if(confirm("SYSTEM WARNING: Are you sure you want to run the Garbage Collector?\n\nThis will permanently delete all abandoned registrations (users who entered an email but never completed the business setup).")) {
+        
+        fetch('backend/purge_ghosts.php', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            alert(data.message);
+            if(data.success) {
+                window.location.reload();
+            }
+        })
+        .catch(err => {
+            alert("CRITICAL ERROR: Could not reach the purge protocol.");
+            console.error(err);
+        });
+    }
+}
+</script>
 
 <?php require_once __DIR__ . '/includes/layout_footer.php'; ?>

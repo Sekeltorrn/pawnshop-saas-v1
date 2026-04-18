@@ -144,13 +144,37 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Encryption Key</label>
-                        <input name="password" required minlength="6" type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <div class="relative group">
+                            <input id="password" name="password" required minlength="6" type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                            <button type="button" onclick="togglePassword('password', 'eye-icon-1')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand_green transition-colors">
+                                <span id="eye-icon-1" class="material-symbols-outlined text-sm">visibility</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="space-y-1.5">
                         <label class="font-mono text-[9px] text-brand_green uppercase tracking-widest font-bold">Confirm Key</label>
-                        <input name="confirm_password" required minlength="6" type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                        <div class="relative group">
+                            <input id="confirm_password" name="confirm_password" required minlength="6" type="password" placeholder="********" class="w-full bg-dark_card border border-outline_gray focus:border-brand_green text-white text-xs font-mono py-3 px-4 outline-none transition-all">
+                            <button type="button" onclick="togglePassword('confirm_password', 'eye-icon-2')" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-brand_green transition-colors">
+                                <span id="eye-icon-2" class="material-symbols-outlined text-sm">visibility</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
+
+                <script>
+                    function togglePassword(inputId, iconId) {
+                        const input = document.getElementById(inputId);
+                        const icon = document.getElementById(iconId);
+                        if (input.type === 'password') {
+                            input.type = 'text';
+                            icon.innerText = 'visibility_off';
+                        } else {
+                            input.type = 'password';
+                            icon.innerText = 'visibility';
+                        }
+                    }
+                </script>
 
                 <div class="pt-4">
                     <button id="submit-btn" type="submit" onclick="this.innerHTML='INITIATING...'; this.style.pointerEvents='none'; this.form.submit();" class="w-full bg-brand_orange text-black font-headline font-black uppercase tracking-[0.3em] py-4 text-xs transition-all hover:brightness-110 glow-orange flex items-center justify-center gap-2">
