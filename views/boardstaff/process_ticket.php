@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // STEP 2: VAULT THE INVENTORY ASSET (Perfectly Matched to Schema)
         // ==============================================================================
         $item_name = trim($_POST['item_name']);
-        $item_condition = trim($_POST['item_condition_text']);
+        $item_condition = trim($_POST['item_condition_text'] ?? '');
         $item_description = trim($_POST['item_description'] ?? ''); // <--- Capture the compiled specs
         
         // HACKER DEFENSE: If appraised value is missing from frontend, calculate it or default to principal
@@ -67,7 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ==============================================================================
         // DYNAMIC CATEGORY RESOLVER & AUTO-CREATOR
         // ==============================================================================
-        $target_category = ($_POST['item_type'] === 'electronics') ? 'Electronics' : 'Jewelry';
+        $item_type = $_POST['item_type'] ?? '';
+        $target_category = ($item_type === 'electronics') ? 'Electronics' : 'Jewelry';
 
         // Search for existing category in the tenant schema
         $stmt_cat = $pdo->prepare("SELECT category_id FROM categories WHERE category_name ILIKE ? LIMIT 1");
