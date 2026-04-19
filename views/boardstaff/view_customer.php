@@ -101,9 +101,16 @@ try {
                 first_name = ?, middle_name = ?, last_name = ?, 
                 contact_no = ?, address = ?, birthday = ?, status = 'verified' 
                 WHERE customer_id = ?");
+                
+            // FIX: Prevent 22007 error by coercing empty birthday strings to NULL
             $stmt->execute([
-                $_POST['first_name'], $_POST['middle_name'], $_POST['last_name'],
-                $_POST['contact_no'], $_POST['address'], $_POST['birthday'], $customer_id
+                $_POST['first_name'], 
+                $_POST['middle_name'], 
+                $_POST['last_name'],
+                $_POST['contact_no'], 
+                $_POST['address'], 
+                !empty($_POST['birthday']) ? $_POST['birthday'] : null, 
+                $customer_id
             ]);
             
             // AUDIT LOG: KYC Approval
