@@ -52,6 +52,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['role_name'] = 'Admin';
                 $_SESSION['is_logged_in'] = true;
 
+                // --- AUDIT LOG INJECTION (ADMIN SUCCESS) ---
+                try {
+                    $audit = $pdo->prepare("INSERT INTO public.audit_logs (user_ip, action, status, schema_name, actor, tab_category, details) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                    $audit->execute([
+                        $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN', 
+                        'LOGIN_SUCCESS', 
+                        'SUCCESS', 
+                        $tenant['schema_name'], 
+                        $email, 
+                        'AUTH', 
+                        'Tenant Admin authenticated successfully via Supabase.'
+                    ]);
+                } catch (Exception $e) {} // Silently proceed if logging fails
+                // -------------------------------------------
+
                 // Handle Remember Me
                 if ($rememberMe) {
                     setcookie('pawnereno_email', $email, time() + (86400 * 30), "/"); 
@@ -139,6 +154,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         // STEP 3: Complete Failure
+        // --- AUDIT LOG INJECTION (LOGIN FAILED) ---
+        try {
+            $audit = $pdo->prepare("INSERT INTO public.audit_logs (user_ip, action, status, schema_name, actor, tab_category, details) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $audit->execute([
+                $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN', 
+                'LOGIN_FAILED', 
+                'FAILED', 
+                'UNKNOWN', // Schema unknown because login failed
+                $email, 
+                'AUTH', 
+                'Multiple failed authentication attempts or invalid credentials.'
+            ]);
+        } catch (Exception $e) {} 
+        // ------------------------------------------
         header("Location: ../../views/auth/login.php?error=" . urlencode("Invalid login credentials."));
         exit;
 

@@ -41,6 +41,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("UPDATE public.profiles SET last_verified_at = NOW() WHERE id = ?");
             $stmt->execute([$userId]);
 
+            // --- AUDIT LOG INJECTION (LOGIN OTP VERIFIED) ---
+            try {
+                $audit = $pdo->prepare("INSERT INTO public.audit_logs (user_ip, action, status, schema_name, actor, tab_category, details) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $audit->execute([
+                    $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN', 
+                    'OTP_VERIFIED_LOGIN', 
+                    'SUCCESS', 
+                    $_SESSION['schema_name'] ?? 'UNKNOWN', 
+                    $email, 
+                    'AUTH', 
+                    'User successfully completed 2FA/Weekly security challenge.'
+                ]);
+            } catch (Exception $e) {} 
+            // ------------------------------------------------
+
             // 4. Remove the security lock flag from their session
             unset($_SESSION['pending_login_verification']);
 

@@ -7,6 +7,7 @@ error_reporting(E_ALL);
 session_start();
 
 require_once __DIR__ . '/../../config/supabase.php';
+require_once __DIR__ . '/../../config/db_connect.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
@@ -37,6 +38,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Let's officially log them into the PHP session
             $_SESSION['user_id'] = $result['body']['user']['id'] ?? null;
             $_SESSION['email'] = $email;
+
+            // --- AUDIT LOG INJECTION (SIGNUP OTP VERIFIED) ---
+            try {
+                $audit = $pdo->prepare("INSERT INTO public.audit_logs (user_ip, action, status, schema_name, actor, tab_category, details) VALUES (?, ?, ?, ?, ?, ?, ?)");
+                $audit->execute([
+                    $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN', 
+                    'OTP_VERIFIED_SIGNUP', 
+                    'SUCCESS', 
+                    'NEW_NODE', 
+                    $email, 
+                    'AUTH', 
+                    'New tenant successfully verified their email address and initialized account.'
+                ]);
+            } catch (Exception $e) {} 
+            // -------------------------------------------------
             
             // Set default tenant flags for brand new users so the Paywall accepts them
             $_SESSION['payment_status'] = 'unpaid';

@@ -150,10 +150,7 @@ function getNavClass($page, $current) {
                 <span class="material-symbols-outlined" data-icon="payments">payments</span>
                 REVENUE
             </a>
-            <a href="payments_ledger.php" class="<?= getNavClass('payments_ledger.php', $current_page) ?>">
-                <span class="material-symbols-outlined" data-icon="payments">payments</span>
-                REVENUE_LEDGER
-            </a>
+
             <a href="audit_logs.php" class="<?= getNavClass('audit_logs.php', $current_page) ?>">
                 <span class="material-symbols-outlined" data-icon="list_alt">list_alt</span>
                 AUDIT_LOGS
@@ -162,10 +159,7 @@ function getNavClass($page, $current) {
                 <span class="material-symbols-outlined" data-icon="settings">settings</span>
                 PLATFORM_CFG
             </a>
-            <a href="backup.php" class="<?= getNavClass('backup.php', $current_page) ?>">
-                <span class="material-symbols-outlined" data-icon="database">database</span>
-                SYS_BACKUP
-            </a>
+
 
             <a href="applicants.php" class="<?= getNavClass('applicants.php', $current_page) ?>">
                 <span class="material-symbols-outlined" data-icon="database">database</span>

@@ -7,6 +7,7 @@ error_reporting(E_ALL);
 session_start();
 
 require_once __DIR__ . '/../../config/supabase.php';
+require_once __DIR__ . '/../../config/db_connect.php';
 
 // Security Check: Do they have the temporary access token?
 if (!isset($_SESSION['recovery_verified']) || !isset($_SESSION['recovery_access_token']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -32,6 +33,29 @@ try {
 
     if (isset($result['code']) && $result['code'] === 200) {
         
+        // --- AUDIT LOG INJECTION (PASSWORD CHANGED) ---
+        try {
+            $recovery_email = $_SESSION['recovery_email'] ?? 'UNKNOWN';
+            
+            // 1. Quickly look up their schema_name using their email
+            $stmt = $pdo->prepare("SELECT schema_name FROM public.profiles WHERE email = ? LIMIT 1");
+            $stmt->execute([$recovery_email]);
+            $schema_name = $stmt->fetchColumn() ?: 'UNKNOWN';
+
+            // 2. Push to the Global Audit Log
+            $audit = $pdo->prepare("INSERT INTO public.audit_logs (user_ip, action, status, schema_name, actor, tab_category, details) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $audit->execute([
+                $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN', 
+                'PASSWORD_CHANGED', 
+                'SUCCESS', 
+                $schema_name, 
+                $recovery_email, 
+                'AUTH', 
+                'Account password was successfully reset via OTP recovery flow.'
+            ]);
+        } catch (Exception $e) {} 
+        // ----------------------------------------------
+
         // SUCCESS! Password changed. Clean up the session variables for security.
         unset($_SESSION['recovery_email']);
         unset($_SESSION['recovery_verified']);

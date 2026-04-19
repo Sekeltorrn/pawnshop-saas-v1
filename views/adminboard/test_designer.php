@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_tests'])) {
         $stmt->execute([$target_node]);
 
         foreach ($names as $i => $name) {
-            if (empty(trim($name))) continue;
+            if (empty(trim($name)) && empty(trim($groups[$i]))) continue;
 
             $stmt = $pdo->prepare("INSERT INTO {$tenant_schema}.asset_tests (node_id, test_name, test_group, impact_type, impact_value) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([
@@ -154,7 +154,14 @@ include 'includes/header.php';
         </div>
         <div class="w-full lg:w-48">
             <label class="text-[8px] font-black text-slate-500 uppercase mb-1 block">Group</label>
-            <input type="text" list="saved_test_groups" name="test_group[]" placeholder="e.g., Display" class="w-full bg-[#0a0b0d] border border-white/10 p-3 text-white text-[11px] font-mono outline-none focus:border-[#ff3e3e]/50">
+            <select class="group-select w-full bg-[#0a0b0d] border border-white/10 p-3 text-white text-[11px] font-mono outline-none focus:border-[#ff3e3e]/50 mb-2" onchange="handleGroupChange(this)">
+                <option value="">-- Select Group --</option>
+                <?php foreach($existing_groups as $group): ?>
+                    <option value="<?= htmlspecialchars($group) ?>"><?= htmlspecialchars($group) ?></option>
+                <?php endforeach; ?>
+                <option value="NEW_GROUP" class="text-[#ff3e3e] font-bold">+ Create New Group</option>
+            </select>
+            <input type="text" name="test_group[]" placeholder="Type new group name..." class="hidden w-full bg-[#0a0b0d] border border-[#ff3e3e]/50 p-3 text-[#ff3e3e] text-[11px] font-mono outline-none focus:border-[#ff3e3e]/50">
         </div>
         <div class="w-full lg:w-32">
             <label class="text-[8px] font-black text-slate-500 uppercase mb-1 block">Impact</label>
@@ -180,13 +187,39 @@ include 'includes/header.php';
     const template = document.getElementById('test-row-template');
     const container = document.getElementById('tests-container');
 
+    function handleGroupChange(selectElem) {
+        const inputElem = selectElem.nextElementSibling;
+        if (selectElem.value === 'NEW_GROUP') {
+            inputElem.classList.remove('hidden');
+            inputElem.value = '';
+            inputElem.focus();
+        } else {
+            inputElem.classList.add('hidden');
+            inputElem.value = selectElem.value;
+        }
+    }
+
     function addTestRow(data = null) {
         const clone = template.content.cloneNode(true);
+        const selectElem = clone.querySelector('.group-select');
+        const inputElem = clone.querySelector('[name="test_group[]"]');
+        
         if (data) {
-            clone.querySelector('[name="test_name[]"]').value = data.test_name;
-            clone.querySelector('[name="test_group[]"]').value = data.test_group;
-            clone.querySelector('[name="impact_type[]"]').value = data.impact_type;
-            clone.querySelector('[name="impact_value[]"]').value = data.impact_value;
+            clone.querySelector('[name="test_name[]"]').value = data.test_name || '';
+            clone.querySelector('[name="impact_type[]"]').value = data.impact_type || 'penalty';
+            clone.querySelector('[name="impact_value[]"]').value = data.impact_value || '';
+            
+            if (data.test_group) {
+                let optionExists = Array.from(selectElem.options).some(opt => opt.value === data.test_group);
+                if (optionExists) {
+                    selectElem.value = data.test_group;
+                    inputElem.value = data.test_group;
+                } else {
+                    selectElem.value = 'NEW_GROUP';
+                    inputElem.value = data.test_group;
+                    inputElem.classList.remove('hidden');
+                }
+            }
         }
         list.appendChild(clone);
     }

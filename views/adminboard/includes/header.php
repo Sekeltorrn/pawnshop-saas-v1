@@ -14,6 +14,52 @@ if (!isset($_SESSION['is_logged_in']) || $_SESSION['is_logged_in'] !== true) {
 // (Adjust this path if your header.php is located somewhere else!)
 require_once __DIR__ . '/../../../config/db_connect.php';
 
+// --- SAAS PAYWALL BOUNCER ---
+$tenant_id = $_SESSION['tenant_id'] ?? $_SESSION['user_id'] ?? $_SESSION['id'] ?? null;
+$role = $_SESSION['role'] ?? 'employee'; // Default to employee if not set
+$current_page = basename($_SERVER['PHP_SELF']);
+
+if ($tenant_id) {
+    $stmt = $pdo->prepare("SELECT created_at, payment_status FROM public.profiles WHERE id = ?");
+    $stmt->execute([$tenant_id]);
+    $tenant_profile = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($tenant_profile) {
+        // Calculate 30-day expiration
+        $created_date = new DateTime($tenant_profile['created_at'] ?? 'now');
+        $expiry_date = clone $created_date;
+        $expiry_date->modify('+30 days');
+        $now = new DateTime();
+        
+        $is_expired = ($now > $expiry_date);
+        $current_status = $tenant_profile['payment_status'] ?? 'inactive';
+        
+        // Auto-suspend if expired but still marked active
+        if ($is_expired && $current_status === 'active') {
+            $suspend = $pdo->prepare("UPDATE public.profiles SET payment_status = 'past_due' WHERE id = ?");
+            $suspend->execute([$tenant_id]);
+            $current_status = 'past_due';
+        }
+        
+        // LOCKDOWN ROUTING
+        if ($current_status === 'past_due' || $current_status === 'suspended') {
+            if ($role !== 'admin' && $role !== 'owner') {
+                // Kick employees entirely out
+                session_destroy();
+                header("Location: /views/auth/login.php?error=shop_suspended");
+                exit;
+            }
+            
+            // Trap admins on the billing page
+            if (($role === 'admin' || $role === 'owner') && $current_page !== 'billing.php') {
+                header("Location: billing.php");
+                exit;
+            }
+        }
+    }
+}
+// --- END SAAS PAYWALL BOUNCER ---
+
 // 3. LISTEN FOR SUPER ADMIN BROADCASTS
 $global_announcement = '';
 try {

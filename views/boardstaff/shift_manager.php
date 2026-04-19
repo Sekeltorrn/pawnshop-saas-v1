@@ -93,7 +93,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             SELECT 
                 s.starting_cash,
                 (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE shift_id = s.shift_id AND payment_channel = 'Walk-In' AND status = 'completed') as cash_in,
-                (SELECT COALESCE(SUM(net_proceeds), 0) FROM loans WHERE employee_id = s.employee_id AND created_at >= s.start_time AND status != 'cancelled') as cash_out
+                (SELECT COALESCE(SUM(net_proceeds), 0) FROM loans WHERE shift_id = s.shift_id AND status != 'cancelled') as cash_out
             FROM shifts s WHERE s.shift_id = ?
         ");
         $stmt_calc->execute([$shift_id]);
@@ -130,9 +130,9 @@ if ($active_shift) {
     $stmt->execute([$shift_id]);
     $live_cash_in = (float)$stmt->fetchColumn();
 
-    // Cash Out: Loans granted by this employee since the shift started
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(net_proceeds), 0) FROM loans WHERE created_at >= ? AND employee_id = ? AND status != 'cancelled'");
-    $stmt->execute([$active_shift['start_time'], $active_shift['employee_id']]);
+    // Cash Out: Only physical loans explicitly tied to this drawer's shift ID
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(net_proceeds), 0) FROM loans WHERE shift_id = ? AND status != 'cancelled'");
+    $stmt->execute([$shift_id]);
     $live_cash_out = (float)$stmt->fetchColumn();
 
     // STRICT MATH: Digital payments are EXCLUDED from the physical drawer expectation

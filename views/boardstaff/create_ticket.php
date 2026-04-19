@@ -222,7 +222,7 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
                 
                 <div class="mt-8 border-t border-outline-variant/10 pt-8">
                     <label class="text-[10px] font-headline font-bold text-primary uppercase block mb-3 tracking-widest">Market Value Appraisal (Base ₱)</label>
-                    <input type="number" id="base_market_value" oninput="calculateDynamic()" step="0.01" placeholder="0.00" class="w-full bg-surface-container-highest border border-primary/30 p-6 text-primary font-headline font-bold text-2xl outline-none rounded-sm tracking-widest shadow-inner">
+                    <input type="number" id="base_market_value" oninput="this.dataset.manual='true'; calculateDynamic()" step="0.01" placeholder="0.00" class="w-full bg-surface-container-highest border border-primary/30 p-6 text-primary font-headline font-bold text-2xl outline-none rounded-sm tracking-widest shadow-inner">
                 </div>
             </div>
 
@@ -444,8 +444,9 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
     async function triggerSpawner(nodeId) {
         const select = document.getElementById('matrix_classification');
         const baseVal = select.options[select.selectedIndex]?.getAttribute('data-base');
-        if (baseVal && baseVal !== '0') {
-            document.getElementById('base_market_value').value = baseVal;
+        const baseInput = document.getElementById('base_market_value');
+        if (baseVal && baseVal !== '0' && baseInput.dataset.manual !== 'true') {
+            baseInput.value = baseVal;
         }
 
         const specContainer = document.getElementById('dynamic-specs-container');
@@ -601,8 +602,9 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         // Check if L4 has a specific base appraisal value overriding L2
         if (!l4Node.disabled && l4Node.selectedIndex > 0) {
             const l4Base = l4Node.options[l4Node.selectedIndex].getAttribute('data-base');
-            if (l4Base && l4Base !== '' && document.activeElement !== document.getElementById('base_market_value')) {
-                document.getElementById('base_market_value').value = l4Base;
+            const baseInput = document.getElementById('base_market_value');
+            if (l4Base && l4Base !== '' && baseInput.dataset.manual !== 'true') {
+                baseInput.value = l4Base;
             }
         }
         
@@ -636,22 +638,40 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
             if (label.includes('carat') && !label.includes('karat')) detectedDiamondCarat = parseFloat(val) || 0;
         });
 
+        const baseInput = document.getElementById('base_market_value');
+        let isAutoCalculated = false;
+
         // 1. Gold Auto-Math
         if (detectedKarat && detectedWeight > 0) {
             const netWeight = detectedWeight - (detectedDeduction || 0);
             let rateKey = Object.keys(GLOBAL_SETTINGS.rates).find(k => detectedKarat.toUpperCase().includes(k));
             let currentRate = rateKey ? GLOBAL_SETTINGS.rates[rateKey] : 0;
             
-            if (currentRate > 0 && document.activeElement !== document.getElementById('base_market_value')) {
-                document.getElementById('base_market_value').value = (netWeight * currentRate).toFixed(2);
+            if (currentRate > 0) {
+                baseInput.value = (netWeight * currentRate).toFixed(2);
+                isAutoCalculated = true;
             }
         }
 
         // 2. Diamond Auto-Math
         if (detectedDiamondCarat > 0 && !detectedKarat) {
-            if (GLOBAL_SETTINGS.diamond_base > 0 && document.activeElement !== document.getElementById('base_market_value')) {
-                document.getElementById('base_market_value').value = (detectedDiamondCarat * GLOBAL_SETTINGS.diamond_base).toFixed(2);
+            if (GLOBAL_SETTINGS.diamond_base > 0) {
+                baseInput.value = (detectedDiamondCarat * GLOBAL_SETTINGS.diamond_base).toFixed(2);
+                isAutoCalculated = true;
             }
+        }
+
+        // 3. AUTHORITARIAN LOCK: Prevent manual override for commodities
+        if (isAutoCalculated) {
+            baseInput.readOnly = true;
+            baseInput.classList.add('bg-primary/10', 'border-primary', 'cursor-not-allowed', 'shadow-[0_0_15px_rgba(0,255,65,0.2)]');
+            baseInput.classList.remove('bg-surface-container-highest', 'border-primary/30');
+            baseInput.dataset.manual = 'false'; // Reset manual flag
+        } else {
+            // Unlock for Electronics/Custom items
+            baseInput.readOnly = false;
+            baseInput.classList.remove('bg-primary/10', 'border-primary', 'cursor-not-allowed', 'shadow-[0_0_15px_rgba(0,255,65,0.2)]');
+            baseInput.classList.add('bg-surface-container-highest', 'border-primary/30');
         }
         // --- END SMART SCANNER ---
 
@@ -708,6 +728,7 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         document.getElementById('matrix_model').disabled = true;
         
         document.getElementById('base_market_value').value = '';
+        document.getElementById('base_market_value').dataset.manual = 'false';
         document.getElementById('dynamic-specs-container').innerHTML = '<div class="col-span-full text-[10px] font-headline text-on-surface-variant/50 uppercase tracking-widest italic py-4">-- Awaiting Classification --</div>';
         document.getElementById('dynamic-tests-container').innerHTML = '<div class="col-span-full text-[10px] font-headline text-on-surface-variant/50 uppercase tracking-widest italic py-4">-- Awaiting Classification --</div>';
         
