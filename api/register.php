@@ -74,107 +74,85 @@ try {
         exit();
     }
 
-    // 2. Check if the user already exists GLOBALLY (in the public.customers bridge table)
+    // 2. Check if the user already exists GLOBALLY
     $pdo->exec("SET search_path TO public");
-    $checkGlobal = $pdo->prepare("SELECT id FROM customers WHERE email = ?");
+    $checkGlobal = $pdo->prepare("SELECT id, full_name FROM customers WHERE email = ?");
     $checkGlobal->execute([$email]);
     $globalUser = $checkGlobal->fetch(PDO::FETCH_ASSOC);
 
     $real_auth_uuid = null;
+    $require_otp = true;
+    $customer_status = 'unverified';
 
     if ($globalUser) {
-        // SCENARIO A: MULTI-SHOP REGISTRATION
-        // They already have a Global Passport (e.g., from Pawnshop A).
-        // We reuse their existing, genuine Supabase UUID. No need to call Supabase API!
+        // CUSTOMER B: EXISTING GLOBAL USER
         $real_auth_uuid = $globalUser['id'];
-    } else {
-        // SCENARIO B: BRAND NEW PLATFORM USER
-        // Call the Supabase Admin API to create their Global Auth account using "God Mode"
-        $supabase_url = getenv('SUPABASE_URL'); 
-        $service_key  = getenv('SUPABASE_SERVICE_KEY'); // Uses the exact Render Env Variable
+        $customer_status = 'verified'; // Skip OTP!
+        $require_otp = false;
+
+        // SECURITY OVERRIDE: Force their true global identity
+        $real_full_name = $globalUser['full_name'] ?: $first_name;
+        $name_parts = explode(' ', $real_full_name, 2);
+        $first_name = $name_parts[0];
+        $last_name  = isset($name_parts[1]) ? $name_parts[1] : '';
         
-        if (!$supabase_url || !$service_key) {
-            throw new Exception("Missing Supabase configuration on server.");
-        }
+    } else {
+        // CUSTOMER A: BRAND NEW USER
+        $supabase_url = getenv('SUPABASE_URL'); 
+        $service_key  = getenv('SUPABASE_SERVICE_KEY'); 
+        if (!$supabase_url || !$service_key) { throw new Exception("Missing Supabase config."); }
 
         $supabase_payload = json_encode([
-            'email' => $email,
-            'password' => $password,
-            'email_confirm' => false, // Set to true if you want to bypass email verification limits
-            'user_metadata' => [
-                'account_type' => 'customer', // This triggers your Smart Traffic Cop SQL!
-                'full_name' => $first_name . ' ' . $last_name
-            ]
+            'email' => $email, 'password' => $password, 'email_confirm' => false,
+            'user_metadata' => ['account_type' => 'customer', 'full_name' => $first_name . ' ' . $last_name]
         ]);
 
         $ch = curl_init($supabase_url . '/auth/v1/admin/users');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $supabase_payload);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'apikey: ' . $service_key,
-            'Authorization: Bearer ' . $service_key,
-            'Content-Type: application/json'
-        ]);
-        
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['apikey: ' . $service_key, 'Authorization: Bearer ' . $service_key, 'Content-Type: application/json']);
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        
         $supabase_user = json_decode($response, true);
 
-        // Catch Supabase failures (like weak passwords)
         if ($http_code >= 400 || !isset($supabase_user['id'])) {
             http_response_code(400);
             echo json_encode(["status" => "error", "message" => "Auth Error: " . ($supabase_user['msg'] ?? 'Registration failed.')]);
             exit();
         }
 
-        // Capture the brand new, genuine UUID
         $real_auth_uuid = $supabase_user['id'];
-        $require_otp = true;
-
-        // ---------------------------------------------------------
-        // CRITICAL FIX: MANUALLY TRIGGER THE OTP EMAIL DISPATCH
-        // ---------------------------------------------------------
-        $anon_key = getenv('SUPABASE_ANON_KEY'); // Fallback fetch if missing above
+        
+        $anon_key = getenv('SUPABASE_ANON_KEY'); 
         if ($anon_key) {
             $resend_payload = json_encode(['type' => 'signup', 'email' => $email]);
             $ch_otp = curl_init($supabase_url . '/auth/v1/resend');
             curl_setopt($ch_otp, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch_otp, CURLOPT_POST, true);
             curl_setopt($ch_otp, CURLOPT_POSTFIELDS, $resend_payload);
-            curl_setopt($ch_otp, CURLOPT_HTTPHEADER, [
-                'apikey: ' . $anon_key,
-                'Content-Type: application/json'
-            ]);
-            curl_exec($ch_otp);
-            curl_close($ch_otp);
+            curl_setopt($ch_otp, CURLOPT_HTTPHEADER, ['apikey: ' . $anon_key, 'Content-Type: application/json']);
+            curl_exec($ch_otp); curl_close($ch_otp);
         }
     }
 
-    // 3. Insert into the TENANT'S Local Customer Table using the Genuine UUID
+    // 3. Insert into the TENANT'S Local Customer Table
     $pdo->exec("SET search_path TO \"$schemaName\"");
     $stmt = $pdo->prepare("INSERT INTO customers (auth_user_id, first_name, last_name, email, contact_no, password, is_walk_in, status) 
-                           VALUES (:auth_id, :fname, :lname, :email, :phone, :pass, FALSE, 'unverified')
+                           VALUES (:auth_id, :fname, :lname, :email, :phone, :pass, FALSE, :status)
                            RETURNING customer_id");
-    
     $stmt->execute([
-        ':auth_id' => $real_auth_uuid, // NO MORE gen_random_uuid()!
-        ':fname'   => $first_name,
-        ':lname'   => $last_name,
-        ':email'   => $email,
-        ':phone'   => $phone,
-        ':pass'    => $hashed_password, 
+        ':auth_id' => $real_auth_uuid, ':fname' => $first_name, ':lname' => $last_name,
+        ':email' => $email, ':phone' => $phone, ':pass' => $hashed_password, ':status' => $customer_status 
     ]);
 
-    // 4. Trigger OTP via your custom flow (If you are using Supabase's built-in email templates, 
-    //    the Admin API already triggered it. If you need a manual resend, do it here).
-
-    echo json_encode([
-        "status" => "success",
-        "message" => "Account created successfully! A verification code has been sent to your email."
-    ]);
+    // 4. Mobile App Response (USING PREFIX HACK)
+    if ($require_otp) {
+        echo json_encode(["status" => "success", "message" => "Account created successfully! A verification code has been sent to your email."]);
+    } else {
+        echo json_encode(["status" => "success", "message" => "BYPASS: Oh hey I know you! I created an account for you in this new pawnshop, but just know that you can't change your global name and email!"]);
+    }
 
 } catch (PDOException $e) {
     http_response_code(500);
