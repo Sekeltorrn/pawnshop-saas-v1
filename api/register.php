@@ -87,8 +87,12 @@ try {
     if ($globalUser) {
         // CUSTOMER B: EXISTING GLOBAL USER
         $real_auth_uuid = $globalUser['id'];
-        $customer_status = 'verified'; // Skip OTP!
-        $require_otp = false;
+        
+        // KYC FIX: Set back to unverified so the local tenant requires ID documents.
+        $customer_status = 'unverified'; 
+        
+        // ROUTING FIX: Keep as false so the mobile app still skips the OTP screen.
+        $require_otp = false; 
 
         // SECURITY OVERRIDE: Force their true global identity
         $real_full_name = $globalUser['full_name'] ?: $first_name;
