@@ -25,8 +25,11 @@ if (!hash_equals($signature, $computed_sig)) {
 $event = json_decode($payload, true);
 
 // Robust Unpacking
+$event_type = $event['data']['attributes']['type'] ?? '';
 $attrs = $event['data']['attributes']['data']['attributes'] ?? $event['data']['attributes'] ?? $event['attributes'] ?? null;
-$is_paid = (isset($event['data']['attributes']['type']) && $event['data']['attributes']['type'] === 'payment.paid') || 
+
+// Accept BOTH standard payments and checkout session payments
+$is_paid = ($event_type === 'payment.paid' || $event_type === 'checkout_session.payment.paid') || 
            (isset($attrs['status']) && $attrs['status'] === 'paid');
 
 if ($attrs && $is_paid) {
