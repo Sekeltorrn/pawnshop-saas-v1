@@ -50,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['schema_name'] = $tenant['schema_name']; 
                 $_SESSION['shop_code'] = $tenant['shop_code'];
                 $_SESSION['role_name'] = 'Admin';
+                $_SESSION['role'] = 'admin'; // Fixes the header.php Paywall Bouncer bug
                 $_SESSION['is_logged_in'] = true;
 
                 // --- AUDIT LOG INJECTION (ADMIN SUCCESS) ---

@@ -8,8 +8,8 @@ if (isset($_SESSION['schema_name']) && isset($pdo)) {
         $schema = $_SESSION['schema_name'];
         $pdo->exec("SET search_path TO \"$schema\", public;");
 
-        // Find stale shifts (opened before today)
-        $stale_stmt = $pdo->query("SELECT shift_id, employee_id, start_time, starting_cash FROM shifts WHERE status = 'Open' AND DATE(start_time) < CURRENT_DATE");
+        // Find stale shifts (open for more than 16 hours to bypass UTC midnight traps)
+        $stale_stmt = $pdo->query("SELECT shift_id, employee_id, start_time, starting_cash FROM shifts WHERE status = 'Open' AND start_time < NOW() - INTERVAL '16 hours'");
         $stale_shifts = $stale_stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (!empty($stale_shifts)) {

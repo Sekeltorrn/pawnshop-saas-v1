@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         'email' => 'admin@pawnereno.com' 
     ];
 
-    $paymongo = createPaymongoCheckout($amount, $description, $reference, $customer);
+    $paymongo = createPaymongoCheckout($amount, $description, $reference, $customer, ['user_id' => $current_user_id]);
 
     if ($paymongo['success']) {
         // --- AUDIT LOG INJECTION (CHECKOUT INITIATED) ---

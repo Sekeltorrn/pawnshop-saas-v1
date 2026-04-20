@@ -11,7 +11,7 @@ if (!$current_user_id || !$schemaName) {
     exit();
 }
 
-$pdo->exec("SET search_path TO \"$schemaName\"");
+$pdo->exec("SET search_path TO \"$schemaName\", public;");
 
 // 2. PIN-GATE SECURITY LOGIC
 $env_path = __DIR__ . '/../../.env';
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $stmt->execute();
                 $active_shift = $stmt->fetch(PDO::FETCH_ASSOC);
             } catch (PDOException $e) {
-                $shift_error = "Database Error: Could not open drawer.";
+                $shift_error = "Database Error: " . $e->getMessage();
             }
         }
     }

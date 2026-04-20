@@ -9,7 +9,7 @@
  * @param array $customer Optional: ['name' => 'John Doe', 'email' => 'juan@example.com', 'phone' => '09123456789']
  * @return array ['success' => true, 'checkout_url' => 'https://...', 'checkout_id' => 'cs_...'] OR ['success' => false, 'error' => '...']
  */
-function createPaymongoCheckout($amount, $description, $reference_number, $customer = [], $custom_success_url = null) {
+function createPaymongoCheckout($amount, $description, $reference_number, $customer = [], $metadata = [], $custom_success_url = null) {
     // 1. LOAD SECRET KEY (From Render Env Vars or local fallback)
     $secret_key = getenv('PAYMONGO_SECRET_KEY');
     
@@ -77,6 +77,11 @@ function createPaymongoCheckout($amount, $description, $reference_number, $custo
             'email' => $customer['email'] ?? 'no-reply@pawnereno.com',
             'phone' => $customer['phone'] ?? ''
         ];
+    }
+
+    // Add metadata if provided (Crucial for webhook identification)
+    if (!empty($metadata)) {
+        $payload['data']['attributes']['metadata'] = $metadata;
     }
 
     // 4. EXECUTE CURL REQUEST TO PAYMONGO

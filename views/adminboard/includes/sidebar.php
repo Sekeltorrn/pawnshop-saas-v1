@@ -21,7 +21,6 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
     </div>
 
     <nav class="flex-1 py-6 space-y-1 overflow-y-auto">
-        
         <div class="px-4 mt-4 mb-3 flex items-center gap-3">
             <span class="w-1.5 h-1.5 rounded-full bg-[#00ff41] shadow-[0_0_5px_#00ff41]"></span>
             <span class="text-[9px] text-[#00ff41] font-black uppercase tracking-[0.3em]">Core</span>
@@ -65,7 +64,7 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
             <div class="flex-1 h-px bg-gradient-to-r from-purple-500/30 to-transparent"></div>
         </div>
 
-        <a class="<?= $base_class ?> <?= ($current_page == 'billing.php') ? $active_class : $inactive_class ?>" href="/views/adminboard/billing.php">
+        <a class="<?= $base_class ?> <?= ($current_page == 'billing.php') ? $active_class : $inactive_class ?>" href="billing.php">
             <span class="material-symbols-outlined text-lg <?= ($current_page == 'billing.php') ? $active_icon : $inactive_icon ?>">card_membership</span>
             Subscriptions
         </a>
@@ -87,6 +86,7 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
             Terminate
         </button>
         
+
     </nav>
 
     <div class="p-6 border-t border-eva-purple/30 bg-[#0a0b0d]">
@@ -164,3 +164,75 @@ $active_icon   = "text-neon-green drop-shadow-[0_0_5px_rgba(0,255,65,0.5)]";
         }
     });
 </script>
+
+<?php if (isset($current_status) && ($current_status === 'past_due' || $current_status === 'suspended')): ?>
+<div id="paywallModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-[200] hidden flex flex-col items-center justify-center p-4 transition-opacity duration-300 opacity-0">
+    <div id="paywallModalContent" class="bg-[#0a0b0d] border border-red-500/30 p-8 max-w-md w-full shadow-[0_0_40px_rgba(239,68,68,0.15)] transform scale-95 transition-transform duration-300 rounded-sm relative overflow-hidden text-center">
+        
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500/20 via-red-500 to-red-500/20"></div>
+
+        <span class="material-symbols-outlined text-red-500 text-5xl opacity-80 mb-4 animate-pulse">lock</span>
+        <h3 class="text-xl font-black text-white uppercase tracking-widest italic mb-2">Access Restricted</h3>
+        
+        <p class="text-slate-400 text-xs mb-8 font-medium leading-relaxed">
+            Your node license has expired. Please settle your outstanding balance to restore full system access.
+        </p>
+        
+        <div class="flex gap-4">
+            <button onclick="closePaywallModal()" class="flex-1 py-4 bg-[#141518] hover:bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded-sm italic">
+                Cancel
+            </button>
+            <a href="billing.php" class="flex-1 py-4 bg-red-500/10 hover:bg-red-500 border border-red-500/50 text-red-500 hover:text-black text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center justify-center shadow-[inset_0_-2px_10px_rgba(239,68,68,0.2)] rounded-sm italic">
+                Pay Now
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Target all links inside the sidebar navigation
+        const sidebarLinks = document.querySelectorAll('aside nav a');
+        
+        sidebarLinks.forEach(link => {
+            const href = link.getAttribute('href');
+            
+            // If the link is NOT billing or logout, hijack it
+            if (href && !href.includes('billing.php') && !href.includes('logout.php')) {
+                
+                // Visually dim the locked links to give a UX hint
+                link.classList.add('opacity-40', 'cursor-not-allowed');
+                link.classList.remove('hover:text-white', 'hover:bg-white/5');
+                
+                // Intercept the click
+                link.addEventListener('click', function(e) {
+                    e.preventDefault(); // Stop navigation
+                    openPaywallModal(); // Trigger feedback
+                });
+            }
+        });
+    });
+
+    const paywallModal = document.getElementById('paywallModal');
+    const paywallContent = document.getElementById('paywallModalContent');
+
+    function openPaywallModal() {
+        paywallModal.classList.remove('hidden');
+        void paywallModal.offsetWidth; // Force reflow
+        paywallModal.classList.remove('opacity-0');
+        paywallModal.classList.add('opacity-100');
+        paywallContent.classList.remove('scale-95');
+        paywallContent.classList.add('scale-100');
+    }
+
+    function closePaywallModal() {
+        paywallModal.classList.remove('opacity-100');
+        paywallModal.classList.add('opacity-0');
+        paywallContent.classList.remove('scale-100');
+        paywallContent.classList.add('scale-95');
+        setTimeout(() => {
+            paywallModal.classList.add('hidden');
+        }, 300); 
+    }
+</script>
+<?php endif; ?>

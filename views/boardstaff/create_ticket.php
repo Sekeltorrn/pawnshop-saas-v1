@@ -630,12 +630,32 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
 
         document.querySelectorAll('.dynamic-spec').forEach(el => {
             const label = el.getAttribute('data-label').toLowerCase();
-            const val = el.value;
+            const val = el.value.toString().toUpperCase().trim();
             
-            if (label.includes('karat') || label.includes('purity')) detectedKarat = val;
-            if (label.includes('weight') && !label.includes('deduction') && !label.includes('carat')) detectedWeight = parseFloat(val) || 0;
-            if (label.includes('deduction')) detectedDeduction = parseFloat(val) || 0;
-            if (label.includes('carat') && !label.includes('karat')) detectedDiamondCarat = parseFloat(val) || 0;
+            if (!val) return; // Skip empty inputs
+
+            // 1. Detect Karat (Auto-appends 'K' if they just typed numbers like "18")
+            if (label.includes('karat') || label.includes('purity')) {
+                detectedKarat = val;
+                if (/^\d+$/.test(detectedKarat)) {
+                    detectedKarat += 'K'; 
+                }
+            }
+
+            // 2. Detect Deduction (Handles both "deduction" and "stone")
+            if (label.includes('deduction') || label.includes('stone')) {
+                detectedDeduction = parseFloat(val) || 0;
+            }
+
+            // 3. Detect Gross Weight (Strictly excludes deduction identifiers)
+            if (label.includes('weight') && !label.includes('deduction') && !label.includes('stone') && !label.includes('carat')) {
+                detectedWeight = parseFloat(val) || 0;
+            }
+
+            // 4. Detect Diamonds
+            if (label.includes('carat') && !label.includes('karat')) {
+                detectedDiamondCarat = parseFloat(val) || 0;
+            }
         });
 
         const baseInput = document.getElementById('base_market_value');
@@ -644,7 +664,8 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
         // 1. Gold Auto-Math
         if (detectedKarat && detectedWeight > 0) {
             const netWeight = detectedWeight - (detectedDeduction || 0);
-            let rateKey = Object.keys(GLOBAL_SETTINGS.rates).find(k => detectedKarat.toUpperCase().includes(k));
+            // Match the sanitized karat string against the global settings keys
+            let rateKey = Object.keys(GLOBAL_SETTINGS.rates).find(k => detectedKarat.includes(k));
             let currentRate = rateKey ? GLOBAL_SETTINGS.rates[rateKey] : 0;
             
             if (currentRate > 0) {
@@ -666,9 +687,8 @@ if (isset($_GET['edit_draft']) && isset($_SESSION['ticket_draft'])) {
             baseInput.readOnly = true;
             baseInput.classList.add('bg-primary/10', 'border-primary', 'cursor-not-allowed', 'shadow-[0_0_15px_rgba(0,255,65,0.2)]');
             baseInput.classList.remove('bg-surface-container-highest', 'border-primary/30');
-            baseInput.dataset.manual = 'false'; // Reset manual flag
+            baseInput.dataset.manual = 'false'; 
         } else {
-            // Unlock for Electronics/Custom items
             baseInput.readOnly = false;
             baseInput.classList.remove('bg-primary/10', 'border-primary', 'cursor-not-allowed', 'shadow-[0_0_15px_rgba(0,255,65,0.2)]');
             baseInput.classList.add('bg-surface-container-highest', 'border-primary/30');
