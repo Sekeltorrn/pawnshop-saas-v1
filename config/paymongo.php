@@ -39,7 +39,12 @@ function createPaymongoCheckout($amount, $description, $reference_number, $custo
 
     // 3. BUILD THE PAYLOAD
     // Determine the base URL for redirects (production domain or local .test)
-    $base_url = getenv('APP_URL') ?: 'http://pawnshop-saas-v1.test';
+    // Dynamically detect the current protocol and host
+    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? "https" : "http";
+    $dynamic_host = isset($_SERVER['HTTP_HOST']) ? ($protocol . "://" . $_SERVER['HTTP_HOST']) : 'http://localhost';
+    
+    // Use APP_URL if set, otherwise use the dynamically detected live/local host
+    $base_url = getenv('APP_URL') ?: $dynamic_host;
     
     $payload = [
         'data' => [
