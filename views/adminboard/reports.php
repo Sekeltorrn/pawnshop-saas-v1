@@ -38,15 +38,14 @@ $shift_id = $active_shift['shift_id'] ?? null;
 
 // If a shift exists, calculate based on shift_id. If no shift exists, default to 0.
 if ($shift_id) {
-    // Cash In (Walk-in payments tied to this specific shift)
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE shift_id = ? AND payment_channel = 'Walk-In' AND status = 'completed'");
-    $stmt->execute([$shift_id]);
+    // Cash In (Walk-in payments tied to this specific shift AND strictly bounded to this calendar day)
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE shift_id = ? AND DATE(payment_date) = ? AND payment_channel = 'Walk-In' AND status = 'completed'");
+    $stmt->execute([$shift_id, $shift_date]);
     $cash_in_physical = (float)$stmt->fetchColumn();
 
-    // Cash Out (Loans granted by the employee during this specific shift)
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(net_proceeds), 0) FROM loans WHERE employee_id = ? AND created_at >= ? AND (updated_at <= ? OR status = 'active')");
-    $end_time = $active_shift['end_time'] ?? date('Y-m-d 23:59:59', strtotime($shift_date));
-    $stmt->execute([$active_shift['employee_id'], $active_shift['start_time'], $end_time]);
+    // Cash Out (Loans granted by the employee strictly bounded to this calendar day)
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(net_proceeds), 0) FROM loans WHERE employee_id = ? AND DATE(created_at) = ? AND status = 'active'");
+    $stmt->execute([$active_shift['employee_id'], $shift_date]);
     $cash_out_physical = (float)$stmt->fetchColumn();
 } else {
     $cash_in_physical = 0;
@@ -55,9 +54,9 @@ if ($shift_id) {
 
 $expected_drawer = ($starting_cash + $cash_in_physical) - $cash_out_physical;
 
-// REALIZED PROFIT (INTEREST + FEES + PENALTIES)
-$stmt = $pdo->prepare("SELECT COALESCE(SUM(interest_paid + service_fee_paid + penalty_paid), 0) FROM payments WHERE shift_id = ? AND payment_channel = 'Walk-In' AND status = 'completed'");
-$stmt->execute([$shift_id]);
+// REALIZED PROFIT (INTEREST + FEES + PENALTIES - Strictly bounded to this calendar day)
+$stmt = $pdo->prepare("SELECT COALESCE(SUM(interest_paid + service_fee_paid + penalty_paid), 0) FROM payments WHERE shift_id = ? AND DATE(payment_date) = ? AND payment_channel = 'Walk-In' AND status = 'completed'");
+$stmt->execute([$shift_id, $shift_date]);
 $physical_profit = (float)$stmt->fetchColumn();
 
 $stmt = $pdo->prepare("SELECT COALESCE(SUM(interest_paid + service_fee_paid + penalty_paid), 0) FROM payments WHERE payment_channel = 'Online' AND DATE(payment_date) = CURRENT_DATE AND status = 'completed'");
