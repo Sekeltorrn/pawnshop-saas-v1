@@ -1,7 +1,27 @@
 <?php
 require_once __DIR__ . '/../config/db_connect.php';
 
-$webhook_secret = getenv('PAYMONGO_TENANT_SECRET') ?: '';
+$webhook_secret = getenv('PAYMONGO_TENANT_SECRET');
+
+// Fallback to parse .env file if getenv() fails on live hosting
+if (!$webhook_secret) {
+    $env_path = __DIR__ . '/../.env'; // Adjust path depending on webhook location
+    if (file_exists($env_path)) {
+        $lines = file($env_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            if (strpos(trim($line), '#') === 0) continue;
+            if (strpos($line, '=') !== false) {
+                list($name, $value) = explode('=', $line, 2);
+                if (trim($name) === 'PAYMONGO_TENANT_SECRET') {
+                    $webhook_secret = trim($value, " \t\n\r\0\x0B\"");
+                    break;
+                }
+            }
+        }
+    }
+}
+
+$webhook_secret = $webhook_secret ?: '';
 $payload = file_get_contents('php://input');
 $signature_header = $_SERVER['HTTP_PAYMONGO_SIGNATURE'] ?? '';
 
