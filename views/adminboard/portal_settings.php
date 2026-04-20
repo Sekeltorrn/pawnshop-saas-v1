@@ -189,6 +189,10 @@ include 'includes/header.php';
                         <span class="material-symbols-outlined text-lg">smartphone</span>
                         <span class="text-[10px] font-black uppercase tracking-widest">App Customizer</span>
                     </button>
+                    <button type="button" onclick="switchSettingsTab('tab-web-customizer')" id="btn-tab-web-customizer" class="setting-nav-btn flex-1 md:flex-none flex items-center justify-center gap-3 px-6 py-3 border hover:bg-[#141518] transition-all rounded-sm bg-[#0a0b0d] border-white/5 text-slate-400">
+                        <span class="material-symbols-outlined text-lg">palette</span>
+                        <span class="text-[10px] font-black uppercase tracking-widest">Web Customizer</span>
+                    </button>
                 </div>
 
                 <div class="space-y-6">
@@ -483,6 +487,46 @@ include 'includes/header.php';
                                 </div>
                             </div>
 
+                        </div>
+                    </div>
+
+                    <div id="tab-web-customizer" class="settings-tab hidden">
+                        <div class="bg-[#141518] border border-white/5 p-8 rounded-sm shadow-xl">
+                            <h3 class="text-white font-black mb-6 flex items-center gap-4 text-[12px] uppercase tracking-[0.3em] border-b border-white/5 pb-4">
+                                <span class="material-symbols-outlined text-[#00ff41] text-xl">brush</span> Dashboard Theme Styling
+                            </h3>
+                            
+                            <form method="POST" action="update_admin_theme.php" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-3 tracking-widest">Background Color</label>
+                                    <div class="flex items-center gap-4 bg-[#0a0b0d] border border-white/5 p-2 rounded-sm">
+                                        <input type="color" name="admin_bg_color" value="<?= htmlspecialchars($portalSettings['admin_bg_color'] ?? '#05010a') ?>" class="w-10 h-10 rounded cursor-pointer bg-transparent border-0">
+                                        <span class="font-mono text-xs text-slate-300">Main Canvas</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-3 tracking-widest">Button / Accent</label>
+                                    <div class="flex items-center gap-4 bg-[#0a0b0d] border border-white/5 p-2 rounded-sm">
+                                        <input type="color" name="admin_btn_color" value="<?= htmlspecialchars($portalSettings['admin_btn_color'] ?? '#ff6a00') ?>" class="w-10 h-10 rounded cursor-pointer bg-transparent border-0">
+                                        <span class="font-mono text-xs text-slate-300">Primary Actions</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="text-[10px] font-bold text-slate-500 uppercase block mb-3 tracking-widest">Base Text Color</label>
+                                    <div class="flex items-center gap-4 bg-[#0a0b0d] border border-white/5 p-2 rounded-sm">
+                                        <input type="color" name="admin_text_color" value="<?= htmlspecialchars($portalSettings['admin_text_color'] ?? '#ffffff') ?>" class="w-10 h-10 rounded cursor-pointer bg-transparent border-0">
+                                        <span class="font-mono text-xs text-slate-300">Typography</span>
+                                    </div>
+                                </div>
+
+                                <div class="col-span-full mt-4 border-t border-white/5 pt-6">
+                                    <button type="submit" class="bg-[#00ff41] hover:bg-[#00cc33] text-black font-black text-[11px] uppercase tracking-widest px-8 py-4 rounded-sm transition-all shadow-[0_0_15px_rgba(0,255,65,0.2)]">
+                                        Apply Dashboard Theme
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                     </div>

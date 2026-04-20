@@ -305,6 +305,9 @@ create table tenant_settings (
   portal_btn_color character varying(7) null default '#ff6b00'::character varying,
   portal_logo_url text null,
   portal_custom_blocks jsonb null default '[{"icon": "location_on", "title": "Location", "content": "1245 Opulence Avenue\nSuite 200\nMetropolis, NY 10022"}, {"icon": "call", "title": "Contact", "content": "+1 (555) 867-5309\nconcierge@merlinpawnshop.com"}, {"icon": "schedule", "title": "Hours", "content": "Mon - Fri: 10:00 AM - 6:00 PM\nSat: 11:00 AM - 4:00 PM\nSun: By Appointment Only"}]'::jsonb,
+  admin_bg_color character varying(50) null default '#05010a'::character varying,
+  admin_btn_color character varying(50) null default '#ff6a00'::character varying,
+  admin_text_color character varying(50) null default '#ffffff'::character varying,
   constraint tenant_settings_pkey primary key (setting_id)
 );
 

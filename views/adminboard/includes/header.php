@@ -123,6 +123,48 @@ $pageTitle = $pageTitle ?? 'Dashboard Overview';
         .cyber-checkbox:checked::before { transform: scale(1); }
         body { min-height: max(884px, 100dvh); }
     </style>
+<?php
+// Fetch dynamic admin theme settings
+$admin_bg = '#05010a'; 
+$admin_btn = '#ff6a00'; 
+$admin_text = '#ffffff'; 
+
+if (isset($_SESSION['schema_name'])) {
+    try {
+        $theme_stmt = $pdo->prepare("SELECT admin_bg_color, admin_btn_color, admin_text_color FROM {$_SESSION['schema_name']}.tenant_settings LIMIT 1");
+        $theme_stmt->execute();
+        $theme_data = $theme_stmt->fetch(PDO::FETCH_ASSOC);
+        if ($theme_data) {
+            $admin_bg = $theme_data['admin_bg_color'] ?? $admin_bg;
+            $admin_btn = $theme_data['admin_btn_color'] ?? $admin_btn;
+            $admin_text = $theme_data['admin_text_color'] ?? $admin_text;
+        }
+    } catch (Exception $e) {}
+}
+?>
+<style>
+    :root {
+        --admin-bg: <?= htmlspecialchars($admin_bg) ?>;
+        --admin-btn: <?= htmlspecialchars($admin_btn) ?>;
+        --admin-text: <?= htmlspecialchars($admin_text) ?>;
+    }
+    
+    /* Override Core Backgrounds */
+    body, main.bg-deep-obsidian\/95, aside.bg-deep-obsidian, .bg-background-dark, .bg-deep-obsidian {
+        background-color: var(--admin-bg) !important;
+    }
+    
+    /* Override Typography */
+    body, .text-white, h1, h2, h3, h4, h5, h6, span.text-white {
+        color: var(--admin-text) !important;
+    }
+    
+    /* Override Buttons & Accents */
+    .bg-primary, .bg-\[\#ff6b00\], .bg-\[\#00ff41\] { background-color: var(--admin-btn) !important; }
+    .text-primary, .text-\[\#ff6b00\], .text-\[\#00ff41\] { color: var(--admin-btn) !important; }
+    .border-primary { border-color: var(--admin-btn) !important; }
+    .fill-primary { fill: var(--admin-btn) !important; }
+</style>
 </head>
 <body class="bg-background-dark font-display text-white selection:bg-primary selection:text-white overflow-hidden flex h-screen">
     
